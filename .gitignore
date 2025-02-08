@@ -1,0 +1,25 @@
+# Virtual environment
+.venv/
+env/
+
+# OS files
+.DS_Store
+
+# IDE files
+.idea/
+.vscode/
+
+# Compiled files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info
+*.log
+
+# Generated files
+dist/
+build/
+generated/
