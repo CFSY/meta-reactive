@@ -25,6 +25,7 @@ class ComputeGraph:
             if node_id not in self._nodes:
                 self._nodes[node_id] = DependencyNode(id=node_id)
                 self._collections[node_id] = collection
+            # TODO: add warning for repeated node id
 
     def add_dependency(self, dependent: Collection, dependency: Collection) -> None:
         with self._lock:
@@ -54,6 +55,7 @@ class ComputeGraph:
         with self._lock:
             node = self._nodes[node_id]
             if not node.invalidated:
+                print("GRAPH INVALIDATING:", node.id)
                 node.invalidated = True
                 # Invalidate all dependent nodes
                 for dependent_id in node.dependents:
@@ -69,12 +71,14 @@ class ComputeGraph:
             collection = self._collections[node_id]
 
             if not node.invalidated and not force:
+                print("SKIP COMPUTE:", node.id)
                 return
 
             self._computation_in_progress.add(node_id)
             try:
                 # First compute all dependencies
                 for dep_id in node.dependencies:
+                    print("CALL COMPUTE (DEP):", node.id, "=>", dep_id)
                     self.compute_node(dep_id, force)
 
                 # Now compute this node
@@ -109,6 +113,8 @@ class ComputedCollection(Collection[K, V]):
     def _compute(self) -> None:
         if self._compute_func is None:
             return
+
+        print("ACTUAL COMPUTE:", self.name)
 
         # Generate cache key based on dependencies' last modified times
         cache_key = self._generate_cache_key()
@@ -156,6 +162,7 @@ class ComputedCollection(Collection[K, V]):
 
         # Notify observers of changes
         for change in changes:
+            print("NOTIFY COMPUTED CHANGES:", change)
             self._notify_observers(change)
 
     def _generate_cache_key(self) -> str:
@@ -169,5 +176,6 @@ class ComputedCollection(Collection[K, V]):
         return hashlib.sha256(key_string.encode()).hexdigest()
 
     def _handle_change(self, source: Collection[K, V], change: Change[K, V]) -> None:
+        print("HANDLE CHANGE", self.name, change.old_value, "=>", change.new_value)
         self._compute_graph.invalidate_node(self.name)
         self._compute_graph.compute_node(self.name)

@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Optional, Any
 
 from .collection import Collection
-from .types import ResourceInstance, SSEMessage
+from .types import ResourceInstance, SSEMessage, Change
 
 logger = logging.getLogger(__name__)
 
@@ -79,14 +79,27 @@ class ResourceManager:
         if instance_id not in self._subscribers:
             raise ValueError(f"Invalid instance ID: {instance_id}")
 
+        collection = self._collections[instance_id]
+
+        # Add subscriber
         self._subscribers[instance_id].add(
             weakref.ref(queue, lambda ref: self._cleanup_subscriber(instance_id, ref))
         )
 
         # Send initial data
-        collection = self._collections[instance_id]
         message = SSEMessage(event="init", data=list(collection.iter_items()))
         await queue.put(message)
+
+        # Set up change callback
+        def on_change(change: Change) -> None:
+            print("CHANGE UPDATE:", change)
+            msg = SSEMessage(
+                event="update",
+                data=[[change.key, [change.new_value] if change.new_value else []]],
+            )
+            asyncio.create_task(self._notify_subscribers(instance_id, msg))
+
+        collection.add_change_callback(on_change)
 
     def _cleanup_subscriber(self, instance_id: str, ref: weakref.ref) -> None:
         if instance_id in self._subscribers:

@@ -22,6 +22,7 @@ class Resource(Generic[K, V]):
         self.compute_graph = compute_graph
 
     def instantiate(self, params: Dict[str, Any]) -> Collection[K, V]:
+        print("INSTANTIATING RESOURCE:", self.name)
         # Validate parameters
         validated_params = self.param_model.model_validate(params)
 

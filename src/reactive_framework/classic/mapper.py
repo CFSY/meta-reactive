@@ -33,6 +33,7 @@ class ManyToOneMapper(Generic[K1, V1, V2]):
         raise NotImplementedError
 
 
+# TODO: only the mapper is suported, manytoone and onetoone are not
 def create_mapped_collection(
     source: Collection[K1, V1],
     mapper: Mapper[K1, V1, K2, V2],

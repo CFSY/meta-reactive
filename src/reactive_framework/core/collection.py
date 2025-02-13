@@ -1,7 +1,7 @@
 import threading
 import weakref
 from datetime import datetime
-from typing import Generic, Dict, List, Optional, Iterator
+from typing import Generic, Dict, List, Optional, Iterator, Callable
 
 from .types import K, V, Change, ComputeResult
 
@@ -14,6 +14,7 @@ class Collection(Generic[K, V]):
         self._lock = threading.RLock()
         self._observers: List[weakref.ref] = []
         self._last_modified = datetime.now()
+        self._change_callbacks: List[Callable[[Change[K, V]], None]] = []
 
     def get(self, key: K) -> Optional[V]:
         with self._lock:
@@ -44,24 +45,37 @@ class Collection(Generic[K, V]):
         with self._lock:
             return iter(self._data.items())
 
-    def add_observer(self, observer: 'Collection[K, V]') -> None:
+    def add_observer(self, observer: "Collection[K, V]") -> None:
         with self._lock:
+            print("ADD OBSERVER", self.name, "+", observer.name)
             self._observers.append(weakref.ref(observer))
 
-    def remove_observer(self, observer: 'Collection[K, V]') -> None:
+    def remove_observer(self, observer: "Collection[K, V]") -> None:
         with self._lock:
-            self._observers = [ref for ref in self._observers
-                             if ref() is not None and ref() is not observer]
+            self._observers = [
+                ref
+                for ref in self._observers
+                if ref() is not None and ref() is not observer
+            ]
+
+    def add_change_callback(self, callback: Callable[[Change[K, V]], None]) -> None:
+        self._change_callbacks.append(callback)
 
     def _notify_observers(self, change: Change[K, V]) -> None:
+        # Notify dependent collections
         for ref in self._observers[:]:
             observer = ref()
+            print("NOTIFY OBSERVER", self.name, "=>", observer.name)
             if observer is not None:
                 observer._handle_change(self, change)
             else:
                 self._observers.remove(ref)
 
-    def _handle_change(self, source: 'Collection[K, V]', change: Change[K, V]) -> None:
+        # Notify change callbacks (e.g., for SSE updates)
+        for callback in self._change_callbacks:
+            callback(change)
+
+    def _handle_change(self, source: "Collection[K, V]", change: Change[K, V]) -> None:
         """Override this in derived classes to handle changes from dependencies"""
         pass
 

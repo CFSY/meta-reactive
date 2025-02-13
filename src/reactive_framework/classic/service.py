@@ -82,6 +82,7 @@ class Service:
     def add_resource(self, name: str, resource: Resource) -> None:
         self.resources[name] = resource
 
+    # TODO: indicate that this is only for initial collections (used by devs)
     def add_collection(self, name: str, collection: Collection) -> None:
         self.collections[name] = collection
         self.compute_graph.add_node(collection)
