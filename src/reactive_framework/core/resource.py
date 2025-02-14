@@ -114,6 +114,7 @@ class ResourceManager:
             queue = ref()
             if queue is not None:
                 try:
+                    print("PUT SSE MESSAGE:", message, "queue length: ", queue.qsize())
                     await queue.put(message)
                 except Exception as e:
                     logger.error(f"Error notifying subscriber: {e}")

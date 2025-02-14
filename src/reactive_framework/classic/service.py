@@ -1,9 +1,10 @@
 import asyncio
 import logging
-from concurrent.futures import ThreadPoolExecutor
-from typing import Dict
+from typing import Dict, AsyncGenerator
 
-from flask import Flask, Response, request
+from hypercorn import Config
+from hypercorn.asyncio import serve
+from quart import Quart, Response, request
 
 from .resource import Resource
 from ..core.collection import Collection
@@ -22,44 +23,42 @@ class Service:
         self.resource_manager = ResourceManager()
         self.resources: Dict[str, Resource] = {}
         self.collections: Dict[str, Collection] = {}
-        self.app = Flask(name)
-        self.executor = ThreadPoolExecutor()
+        self.app = Quart(name)
         self._setup_routes()
 
     def _setup_routes(self) -> None:
         @self.app.route("/v1/streams/<resource_name>", methods=["POST"])
-        def create_stream(resource_name: str) -> tuple[Dict[str, str], int]:
+        async def create_stream(resource_name: str) -> tuple[Dict[str, str], int]:
             if resource_name not in self.resources:
                 return {"error": "Resource not found"}, 404
 
-            params = request.get_json()
+            params = await request.get_json()
             resource = self.resources[resource_name]
 
             try:
                 collection = resource.instantiate(params)
-                instance_id = asyncio.run(
-                    self.resource_manager.create_instance(
-                        resource_name, params, collection
-                    )
+                instance_id = await self.resource_manager.create_instance(
+                    resource_name, params, collection
                 )
+
                 return {"instance_id": instance_id}, 200
             except Exception as e:
                 logger.error(f"Error creating stream: {e}")
                 return {"error": str(e)}, 400
 
         @self.app.route("/v1/streams/<instance_id>", methods=["GET"])
-        def get_stream(instance_id: str) -> Response:
+        async def get_stream(instance_id: str) -> Response:
             instance = self.resource_manager.get_instance(instance_id)
             if not instance:
                 return Response({"error": "Stream not found"}, status=404)
 
-            def generate() -> str:
+            async def generate() -> AsyncGenerator[str, None]:
                 queue: asyncio.Queue = asyncio.Queue()
-                asyncio.run(self.resource_manager.subscribe(instance_id, queue))
+                await self.resource_manager.subscribe(instance_id, queue)
 
                 while True:
                     try:
-                        message = asyncio.run(queue.get())
+                        message = await queue.get()
                         yield message.format()
                     except Exception as e:
                         logger.error(f"Error in stream: {e}")
@@ -72,9 +71,9 @@ class Service:
             )
 
         @self.app.route("/v1/streams/<instance_id>", methods=["DELETE"])
-        def delete_stream(instance_id: str) -> tuple[Dict[str, str], int]:
+        async def delete_stream(instance_id: str) -> tuple[Dict[str, str], int]:
             try:
-                asyncio.run(self.resource_manager.destroy_instance(instance_id))
+                await self.resource_manager.destroy_instance(instance_id)
                 return {"status": "success"}, 200
             except Exception as e:
                 return {"error": str(e)}, 400
@@ -89,8 +88,9 @@ class Service:
 
     async def start(self) -> None:
         await self.resource_manager.start()
-        self.executor.submit(self.app.run, host=self.host, port=self.port, debug=False)
+        config = Config()
+        config.bind = [f"{self.host}:{self.port}"]
+        await serve(self.app, config)
 
     async def stop(self) -> None:
         await self.resource_manager.stop()
-        self.executor.shutdown(wait=True)

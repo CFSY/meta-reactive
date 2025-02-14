@@ -5,8 +5,6 @@ from typing import List
 
 from pydantic import BaseModel
 
-from examples.temp_monitor.client import run_client
-from examples.utils.colored_logger import setup_logger
 from src.reactive_framework.classic.mapper import (
     OneToOneMapper,
     ManyToOneMapper,
@@ -15,9 +13,6 @@ from src.reactive_framework.classic.mapper import (
 from src.reactive_framework.classic.resource import Resource, ResourceParams
 from src.reactive_framework.classic.service import Service
 from src.reactive_framework.core.collection import Collection
-
-server_logger = setup_logger("server", "SERVER")
-sensor_logger = setup_logger("sensor", "INFO")
 
 
 # Data Models
@@ -99,13 +94,6 @@ async def main():
     )
     service.add_resource("monitor", monitor)
 
-    # Start service
-    await service.start()
-    server_logger.info("Service started")
-
-    # Start client
-    client_task = asyncio.create_task(run_client())
-
     # Simulate sensor readings
     async def simulate_sensors():
         sensors = ["sensor1"]
@@ -121,21 +109,18 @@ async def main():
                     [reading] if old_readings is None else old_readings + [reading]
                 )
                 readings.set(sensor_id, new_readings)
-                sensor_logger.info(
-                    f"New reading - Sensor: {sensor_id}, "
-                    f"Temperature: {reading.temperature:.1f}°C"
-                )
+
+                print("New reading - Sensor:", sensor_id, reading.temperature)
             await asyncio.sleep(2)
 
-    # Start simulation
-    simulation_task = asyncio.create_task(simulate_sensors())
-
     try:
-        # Keep service running
-        while True:
-            await asyncio.sleep(1)
+        # Create tasks for both the service and simulation
+        service_task = asyncio.create_task(service.start())
+        simulation_task = asyncio.create_task(simulate_sensors())
+
+        # Wait for both tasks
+        await asyncio.gather(service_task, simulation_task)
     except KeyboardInterrupt:
-        server_logger.info("Shutting down...")
         simulation_task.cancel()
         await service.stop()
 

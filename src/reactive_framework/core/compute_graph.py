@@ -57,7 +57,7 @@ class ComputeGraph:
             if not node.invalidated:
                 print("GRAPH INVALIDATING:", node.id)
                 node.invalidated = True
-                # Invalidate all dependent nodes
+                # Recursively invalidate all dependent nodes
                 for dependent_id in node.dependents:
                     self.invalidate_node(dependent_id)
 
