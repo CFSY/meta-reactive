@@ -1,4 +1,6 @@
-from ..core.collection import Collection
+import inspect
+
+from .analysis import CodeAnalyzer
 from ..core.collection import Collection
 from ..core.compute_graph import ComputeGraph
 from ..core.types import K, V, Change
