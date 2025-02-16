@@ -5,12 +5,8 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from examples.temp_monitor.client import run_client
-from examples.utils.colored_logger import setup_logger
 from src.reactive_framework.meta.decorators import collection, resource, computed
 from src.reactive_framework.meta.service import MetaService
-
-server_logger = setup_logger("server", "SERVER")
-sensor_logger = setup_logger("sensor", "INFO")
 
 
 # Data Models
@@ -73,7 +69,6 @@ async def main():
 
     # Start service
     await service.start()
-    server_logger.info("Service started")
 
     # Start client
     client_task = asyncio.create_task(run_client())
@@ -90,10 +85,7 @@ async def main():
                     timestamp=datetime.now(),
                 )
                 readings_collection.set(sensor_id, reading)
-                sensor_logger.info(
-                    f"New reading - Sensor: {sensor_id}, "
-                    f"Temperature: {reading.temperature:.1f}°C"
-                )
+                print("New reading - Sensor:", sensor_id, reading.temperature)
             await asyncio.sleep(2)
 
     # Start simulation
@@ -104,7 +96,6 @@ async def main():
         while True:
             await asyncio.sleep(1)
     except KeyboardInterrupt:
-        server_logger.info("Shutting down...")
         simulation_task.cancel()
         client_task.cancel()
         await service.stop()

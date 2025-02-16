@@ -1,6 +1,7 @@
 import functools
 import inspect
-from typing import Any, Type, TypeVar, Optional, Dict, Callable
+import types
+from typing import Any, Type, Optional, Dict, Callable, TypeVar
 
 from pydantic import BaseModel, create_model
 
@@ -8,52 +9,35 @@ from .analysis import CodeAnalyzer, DependencyGraphBuilder
 from ..core.collection import Collection
 from ..core.compute_graph import ComputeGraph, ComputedCollection
 
-T = TypeVar("T", bound=BaseModel)
+KT = TypeVar("KT")
+VT = TypeVar("VT", bound=BaseModel)
 
 
-def collection(
-    name: Optional[str] = None,
-    key_type: Any = int,
-    value_type: Optional[Type[BaseModel]] = None,
-) -> Callable:
+def collection(name: str, key_type: Type[KT], value_type: Type[VT]) -> Callable:
     def decorator(cls: Type) -> Type:
-        # Create Pydantic model for values if not provided
-        nonlocal value_type
-        if value_type is None:
-            annotations = getattr(cls, "__annotations__", {})
-            value_type = create_model(
-                f"{cls.__name__}Model",
-                **{
-                    field: (type_, ...)
-                    for field, type_ in annotations.items()
-                    if not field.startswith("_")
-                },
-            )
+        if not isinstance(key_type, type):
+            raise TypeError(f"key_type must be a type, got {key_type}")
 
-        # Create metaclass for automatic dependency management
-        class CollectionMeta(type):
-            def __new__(mcs, name, bases, namespace):
-                # Analyze dependencies in methods
-                deps = CodeAnalyzer.analyze_class(cls)
+        if not isinstance(value_type, type) or not issubclass(value_type, BaseModel):
+            raise TypeError(f"value_type must be a Pydantic model, got {value_type}")
 
-                # Store dependency information
-                namespace["_dependencies"] = deps
+        # Analyze dependencies in methods
+        deps = CodeAnalyzer.analyze_class(cls)
 
-                return super().__new__(mcs, name, bases, namespace)
+        # Create namespace for new class
+        namespace = {
+            **{k: v for k, v in cls.__dict__.items() if not k.startswith("__")},
+            "_dependencies": deps,
+            "_key_type": key_type,
+            "_value_type": value_type,
+            "_collection_name": name,
+        }
+        bases = (ComputedCollection[key_type, value_type],)
 
-        # Create new class with metaclass
-        new_cls = CollectionMeta(
-            cls.__name__,
-            (ComputedCollection[key_type, value_type],),  # type: ignore
-            {
-                **{k: v for k, v in cls.__dict__.items() if not k.startswith("__")},
-                "_key_type": key_type,
-                "_value_type": value_type,
-                "_collection_name": name or cls.__name__.lower(),
-            },
-        )
+        def exec_body(ns: Dict) -> None:
+            ns.update(namespace)
 
-        return new_cls
+        return types.new_class(cls.__name__, bases, {"metaclass": type}, exec_body)
 
     return decorator
 
@@ -69,9 +53,10 @@ def resource(
             param_model = create_model(
                 f"{cls.__name__}Params",
                 **{
-                    name: (param.annotation, ...)
-                    for name, param in init_params.items()
-                    if name != "self" and param.annotation != inspect.Parameter.empty
+                    param_name: (param.annotation, ...)
+                    for param_name, param in init_params.items()
+                    if param_name != "self"
+                    and param.annotation != inspect.Parameter.empty
                 },
             )
 
