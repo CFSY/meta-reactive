@@ -105,9 +105,15 @@ async def main():
                     timestamp=datetime.now(),
                 )
                 old_readings = readings.get(sensor_id)
-                new_readings = (
-                    [reading] if old_readings is None else old_readings + [reading]
-                )
+
+                # Create new readings list
+                if old_readings is None:
+                    new_readings = [reading]
+                else:
+                    new_readings = old_readings + [reading]
+                    # Keep only the latest 10 readings
+                    new_readings = new_readings[-10:]
+
                 readings.set(sensor_id, new_readings)
 
                 print("New reading - Sensor:", sensor_id, reading.temperature)
