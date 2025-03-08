@@ -47,7 +47,7 @@ class Collection(Generic[K, V]):
 
     def add_observer(self, observer: "Collection[K, V]") -> None:
         with self._lock:
-            print("ADD OBSERVER", self.name, "+", observer.name)
+            print(f"ADD OBSERVER {self.name} -> {observer.name}")
             self._observers.append(weakref.ref(observer))
 
     def remove_observer(self, observer: "Collection[K, V]") -> None:
@@ -72,6 +72,11 @@ class Collection(Generic[K, V]):
                 self._observers.remove(ref)
 
         # Notify change callbacks (e.g., for SSE updates)
+        for callback in self._change_callbacks:
+            callback(change)
+
+    def _notify_callbacks_only(self, change: Change[K, V]) -> None:
+        """Notify only change callbacks, not observers (used during coordinated updates)"""
         for callback in self._change_callbacks:
             callback(change)
 

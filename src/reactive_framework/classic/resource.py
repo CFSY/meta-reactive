@@ -21,6 +21,7 @@ class Resource(Generic[K, V]):
         self.param_model = param_model
         self.compute_graph = compute_graph
 
+    # Think of this as a collection factory configured by params
     def instantiate(self, params: Dict[str, Any]) -> Collection[K, V]:
         print("INSTANTIATING RESOURCE:", self.name)
         # Validate parameters
@@ -29,15 +30,7 @@ class Resource(Generic[K, V]):
         # Create a new collection for this instance
         collection = self.create_collection(validated_params)
 
-        # Set up dependencies
-        self.setup_dependencies(collection, validated_params)
-
         return collection
 
     def create_collection(self, params: ResourceParams) -> Collection[K, V]:
-        raise NotImplementedError
-
-    def setup_dependencies(
-        self, collection: Collection[K, V], params: ResourceParams
-    ) -> None:
         raise NotImplementedError

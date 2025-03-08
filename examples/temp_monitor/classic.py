@@ -76,9 +76,6 @@ class TemperatureMonitorResource(Resource[str, dict]):
 
         return alerts
 
-    def setup_dependencies(self, collection, params: MonitorParams):
-        self.compute_graph.add_dependency(collection, self.readings)
-
 
 async def main():
     # Initialize service

@@ -92,7 +92,6 @@ class ResourceManager:
 
         # Set up change callback
         def on_change(change: Change) -> None:
-            print("CHANGE UPDATE:", change)
             msg = SSEMessage(
                 event="update",
                 data=[[change.key, [change.new_value] if change.new_value else []]],
