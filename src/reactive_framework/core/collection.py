@@ -1,7 +1,6 @@
 import threading
-import weakref
 from datetime import datetime
-from typing import Generic, Dict, List, Optional, Iterator
+from typing import Generic, Dict, Optional, Iterator
 
 from .types import K, V, Change
 
@@ -11,7 +10,6 @@ class Collection(Generic[K, V]):
         self.name = name
         self._data: Dict[K, V] = {}
         self._lock = threading.RLock()
-        self._observers: List[weakref.ref] = []
         self._last_modified = datetime.now()
 
     def get(self, key: K) -> Optional[V]:
