@@ -36,14 +36,8 @@ class DependencyNode(BaseModel):
     dependents: List[str] = []
     invalidated: bool = False
     last_computed: Optional[datetime] = None
-
-
-class ComputeResult(BaseModel, Generic[K, V]):
-    """Result of a computation"""
-
-    changes: List[Change[K, V]]
-    cache_key: str
-    computed_at: datetime = datetime.now()
+    # set of instance_id to change callback
+    change_callbacks: Dict[str, Callable[[Change], None]] = {}
 
 
 class ResourceInstance(BaseModel):

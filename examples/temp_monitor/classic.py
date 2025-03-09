@@ -12,7 +12,7 @@ from src.reactive_framework.classic.mapper import (
 )
 from src.reactive_framework.classic.resource import Resource, ResourceParams
 from src.reactive_framework.classic.service import Service
-from src.reactive_framework.core.collection import Collection
+from src.reactive_framework.core.compute_graph import ComputedCollection
 
 
 # Data Models
@@ -40,6 +40,9 @@ class TemperatureAlertMapper(OneToOneMapper[str, float, str]):
         self.threshold = threshold
 
     def map_value(self, avg_temp: float) -> str:
+
+        print(f"ALERT MAPPER: avg={avg_temp}")
+
         if avg_temp > self.threshold:
             return f"ALERT: Temperature {avg_temp:.1f}°C exceeds threshold {self.threshold}°C"
         return f"Normal: Temperature {avg_temp:.1f}°C"
@@ -54,7 +57,7 @@ class MonitorParams(ResourceParams):
 class TemperatureMonitorResource(Resource[str, dict]):
     def __init__(self, name: str, readings_collection, compute_graph):
         super().__init__(name, MonitorParams, compute_graph)
-        self.readings = readings_collection
+        self.readings: ComputedCollection = readings_collection
         print("RESOURCE INIT:", self.name)
 
     def create_collection(self, params: MonitorParams):
@@ -82,8 +85,10 @@ async def main():
     service = Service("temperature_monitor", port=1234)
 
     # Create a collection for sensor readings
-    readings = Collection[str, List[SensorReading]]("sensor_readings")
-    service.add_collection("readings", readings)
+    readings = ComputedCollection[str, List[SensorReading]](
+        "sensor_readings", service.compute_graph
+    )
+    service.add_collection("sensor_readings", readings)
 
     # Create and add resource
     monitor = TemperatureMonitorResource(

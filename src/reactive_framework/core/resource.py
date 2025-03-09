@@ -5,7 +5,7 @@ import weakref
 from datetime import datetime, timedelta
 from typing import Dict, Optional, Any
 
-from .collection import Collection
+from .compute_graph import ComputedCollection
 from .types import ResourceInstance, SSEMessage, Change
 
 logger = logging.getLogger(__name__)
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class ResourceManager:
     def __init__(self):
         self._instances: Dict[str, ResourceInstance] = {}
-        self._collections: Dict[str, Collection] = {}
+        self._collections: Dict[str, ComputedCollection] = {}
         self._subscribers: Dict[str, set[weakref.ref[asyncio.Queue]]] = {}
         self._cleanup_task: Optional[asyncio.Task] = None
         self._cleanup_interval = timedelta(minutes=5)
@@ -52,7 +52,7 @@ class ResourceManager:
             await self.destroy_instance(instance_id)
 
     async def create_instance(
-        self, resource_name: str, params: Dict[str, Any], collection: Collection
+        self, resource_name: str, params: Dict[str, Any], collection: ComputedCollection
     ) -> str:
         instance_id = str(uuid.uuid4())
         self._instances[instance_id] = ResourceInstance(
@@ -98,7 +98,7 @@ class ResourceManager:
             )
             asyncio.create_task(self._notify_subscribers(instance_id, msg))
 
-        collection.add_change_callback(on_change)
+        collection.add_change_callback(instance_id, on_change)
 
     def _cleanup_subscriber(self, instance_id: str, ref: weakref.ref) -> None:
         if instance_id in self._subscribers:
@@ -130,5 +130,5 @@ class ResourceManager:
             instance.last_accessed = datetime.now()
         return instance
 
-    def get_collection(self, instance_id: str) -> Optional[Collection]:
+    def get_collection(self, instance_id: str) -> Optional[ComputedCollection]:
         return self._collections.get(instance_id)

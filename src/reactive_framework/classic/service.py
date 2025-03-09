@@ -36,6 +36,7 @@ class Service:
             resource = self.resources[resource_name]
 
             try:
+                # TODO: resource manager should take the resource and call instantiate instead of taking a collection
                 collection = resource.instantiate(params)
                 instance_id = await self.resource_manager.create_instance(
                     resource_name, params, collection
@@ -84,6 +85,8 @@ class Service:
     # TODO: indicate that this is only for initial collections (used by devs)
     def add_collection(self, name: str, collection: Collection) -> None:
         self.collections[name] = collection
+
+        # TODO: add node changed, check this again
         self.compute_graph.add_node(collection)
 
     async def start(self) -> None:

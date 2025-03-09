@@ -1,6 +1,5 @@
 from typing import Generic, TypeVar, Protocol, Iterator
 
-from ..core.collection import Collection
 from ..core.compute_graph import ComputeGraph, ComputedCollection
 
 K1 = TypeVar("K1")
@@ -34,7 +33,7 @@ class ManyToOneMapper(Generic[K1, V1, V2]):
 
 
 def create_mapped_collection(
-    source: Collection[K1, V1],
+    source: ComputedCollection[K1, V1],
     mapper: Mapper[K1, V1, K2, V2],
     compute_graph: ComputeGraph,
     name: str,
