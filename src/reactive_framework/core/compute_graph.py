@@ -2,7 +2,7 @@ import hashlib
 import logging
 import threading
 from datetime import datetime
-from typing import Dict, Set, Optional, TypeVar, Callable, List, Tuple
+from typing import Dict, Set, Optional, TypeVar, Callable, List, Tuple, Iterator, Generic
 
 from .collection import Collection
 from .types import K, V, DependencyNode, Change
@@ -10,6 +10,8 @@ from .types import K, V, DependencyNode, Change
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
+K2 = TypeVar("K2")
+V2 = TypeVar("V2")
 
 
 class ComputeGraph:
@@ -30,7 +32,7 @@ class ComputeGraph:
             return self._nodes[node_id]
 
     def add_dependency(
-        self, dependent: "ComputedCollection", dependency: "ComputedCollection"
+            self, dependent: "ComputedCollection", dependency: "ComputedCollection"
     ) -> None:
         with self._lock:
             dep_node = self._nodes[dependency.name]
@@ -43,7 +45,7 @@ class ComputeGraph:
                 dependent_node.dependencies.append(dependency.name)
 
     def remove_dependency(
-        self, dependent: "ComputedCollection", dependency: "ComputedCollection"
+            self, dependent: "ComputedCollection", dependency: "ComputedCollection"
     ) -> None:
         with self._lock:
             dep_node = self._nodes[dependency.name]
@@ -196,7 +198,7 @@ class ComputedCollection(Collection[K, V]):
         self._compute_func: Optional[Callable[[], Dict[K, V]]] = None
 
     def add_change_callback(
-        self, instance_id: str, callback: Callable[[Change[K, V]], None]
+            self, instance_id: str, callback: Callable[[Change[K, V]], None]
     ) -> None:
         self._dependency_node.change_callbacks[instance_id] = callback
 
@@ -225,7 +227,6 @@ class ComputedCollection(Collection[K, V]):
         print("ACTUAL COMPUTE:", self.name)
 
         changes: list[Change[K, V]] = []
-
 
         # Compute new values
         new_data = self._compute_func()
@@ -262,3 +263,36 @@ class ComputedCollection(Collection[K, V]):
 
         key_string = "|".join(components)
         return hashlib.sha256(key_string.encode()).hexdigest()
+
+    def map(self, mapper, name: str = None) -> "ComputedCollection[K2, V2]":
+        """
+        Creates a new computed collection by applying a mapper to this collection.
+
+        Args:
+            mapper: A Mapper instance that defines the transformation
+            name: Optional name for the resulting collection. If not provided,
+                  a name will be generated based on this collection's name.
+
+        Returns:
+            A new ComputedCollection containing the mapped data
+        """
+        # Generate a name if not provided
+        if name is None:
+            name = f"{self.name}_mapped_{id(mapper)}"
+
+        # Create the new computed collection
+        result = ComputedCollection[K2, V2](name, self._compute_graph)
+
+        # Define the compute function
+        def compute_func() -> dict[K2, V2]:
+            new_data: dict[K2, V2] = {}
+            for key, value in self.iter_items():
+                for mapped_key, mapped_value in mapper.map_element(key, value):
+                    new_data[mapped_key] = mapped_value
+            return new_data
+
+        # Set the compute function and add the dependency
+        result.set_compute_func(compute_func)
+        self._compute_graph.add_dependency(result, self)
+
+        return result

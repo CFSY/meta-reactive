@@ -8,7 +8,6 @@ from pydantic import BaseModel
 from src.reactive_framework.classic.mapper import (
     OneToOneMapper,
     ManyToOneMapper,
-    create_mapped_collection,
 )
 from src.reactive_framework.classic.resource import Resource, ResourceParams
 from src.reactive_framework.classic.service import Service
@@ -40,7 +39,6 @@ class TemperatureAlertMapper(OneToOneMapper[str, float, str]):
         self.threshold = threshold
 
     def map_value(self, avg_temp: float) -> str:
-
         print(f"ALERT MAPPER: avg={avg_temp}")
 
         if avg_temp > self.threshold:
@@ -61,20 +59,14 @@ class TemperatureMonitorResource(Resource[str, dict]):
         print("RESOURCE INIT:", self.name)
 
     def create_collection(self, params: MonitorParams):
-        # First, compute average temperatures
-        averages = create_mapped_collection(
-            self.readings,
-            AverageTemperatureMapper(),
-            self.compute_graph,
-            f"{self.name}_averages",
+        # First, compute average temperatures using the new map method
+        averages = self.readings.map(
+            AverageTemperatureMapper(), f"{self.name}_averages"
         )
 
-        # Then, generate alerts based on averages
-        alerts = create_mapped_collection(
-            averages,
-            TemperatureAlertMapper(params.threshold),
-            self.compute_graph,
-            f"{self.name}_alerts",
+        # Then, generate alerts based on averages using the new map method
+        alerts = averages.map(
+            TemperatureAlertMapper(params.threshold), f"{self.name}_alerts"
         )
 
         return alerts
