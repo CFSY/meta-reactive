@@ -78,12 +78,14 @@ async def run_client():
                                             for item in data:
                                                 if item and len(item) > 1:
                                                     sensor_id = item[0]
-                                                    sensor_data = (
-                                                        item[1][0] if item[1] else {}
-                                                    )
+
+                                                    sensor_data = item[1]
                                                     if sensor_data:
+                                                        timestamp = time.strftime(
+                                                            "%H:%M:%S"
+                                                        )
                                                         print(
-                                                            f"  {sensor_id}: {format_alert(sensor_data)}"
+                                                            f"[{timestamp}] {sensor_id}: {format_alert(sensor_data)}"
                                                         )
                                         else:
                                             # Handle updates

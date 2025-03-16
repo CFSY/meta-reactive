@@ -36,12 +36,22 @@ class Service:
             resource = self.resources[resource_name]
 
             try:
+                # Check if an instance with these params already exists
+                existing_id = await self.resource_manager.find_existing_instance(
+                    resource_name, params
+                )
+
+                if existing_id:
+                    logger.info(f"Reusing existing stream instance: {existing_id}")
+                    return {"instance_id": existing_id, "reused": True}, 200
+
+                # Create new instance if none exists
                 collection = resource.instantiate(params)
                 instance_id = await self.resource_manager.create_instance(
                     resource_name, params, collection
                 )
 
-                return {"instance_id": instance_id}, 200
+                return {"instance_id": instance_id, "reused": False}, 200
             except Exception as e:
                 logger.error(f"Error creating stream: {e}")
                 return {"error": str(e)}, 400

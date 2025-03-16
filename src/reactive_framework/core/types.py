@@ -46,8 +46,6 @@ class ResourceInstance(BaseModel):
     id: str
     resource_name: str
     params: Dict[str, Any]
-    created_at: datetime = datetime.now()
-    last_accessed: datetime = datetime.now()
 
 
 class SSEMessage(BaseModel):
