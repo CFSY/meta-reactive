@@ -1,8 +1,35 @@
 # Client implementation
 import asyncio
 import json
+import time
 
 import aiohttp
+
+
+def format_alert(data):
+    """Format temperature alert data for display"""
+
+    alert_symbols = {"normal": "✓", "low": "❄️", "high": "🔥", "critical": "⚠️"}
+
+    alert_colors = {
+        "normal": "\033[92m",  # Green
+        "low": "\033[94m",  # Blue
+        "high": "\033[93m",  # Yellow
+        "critical": "\033[91m",  # Red
+    }
+
+    reset_color = "\033[0m"
+
+    # Default values if keys are missing
+    location = data.get("location", "unknown")
+    temp = data.get("temperature", "N/A")
+    alert_level = data.get("alert_level", "normal")
+    details = data.get("details", "No details available")
+
+    symbol = alert_symbols.get(alert_level, "?")
+    color = alert_colors.get(alert_level, "\033[0m")
+
+    return f"{color}{symbol} [{location}] {temp}°C - {details}{reset_color}"
 
 
 async def run_client():
@@ -19,6 +46,9 @@ async def run_client():
 
             # Connect to stream
             print("Connecting to stream...")
+            print("\nTemperature Monitor - Live Alerts")
+            print("=================================")
+
             async with session.get(
                 f"http://localhost:1234/v1/streams/{stream_id}",
                 headers={
@@ -38,9 +68,38 @@ async def run_client():
                                 if field.startswith("data:"):
                                     try:
                                         data = json.loads(field[5:].strip())
-                                        print(
-                                            f"Received update: {json.dumps(data, indent=2)}"
-                                        )
+
+                                        # Handle initial data differently
+                                        if (
+                                            "event" in message
+                                            and "event: init" in message
+                                        ):
+                                            print("\nInitial state:")
+                                            for item in data:
+                                                if item and len(item) > 1:
+                                                    sensor_id = item[0]
+                                                    sensor_data = (
+                                                        item[1][0] if item[1] else {}
+                                                    )
+                                                    if sensor_data:
+                                                        print(
+                                                            f"  {sensor_id}: {format_alert(sensor_data)}"
+                                                        )
+                                        else:
+                                            # Handle updates
+                                            print("\nUpdated state:")
+                                            for item in data:
+                                                if item and len(item) > 1:
+                                                    sensor_id = item[0]
+                                                    updates = item[1]
+                                                    if updates and len(updates) > 0:
+                                                        # Print with timestamp
+                                                        timestamp = time.strftime(
+                                                            "%H:%M:%S"
+                                                        )
+                                                        print(
+                                                            f"[{timestamp}] {sensor_id}: {format_alert(updates[0])}"
+                                                        )
                                     except json.JSONDecodeError as e:
                                         print(f"Error parsing JSON: {e}")
                         buffer = ""

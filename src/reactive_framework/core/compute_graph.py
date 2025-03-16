@@ -1,7 +1,7 @@
 import logging
 import threading
 from datetime import datetime
-from typing import Dict, Set, Optional, TypeVar, Callable, List, Tuple
+from typing import Dict, Set, Optional, TypeVar, Callable, List, Tuple, Type, Any
 
 from .collection import Collection
 from .types import K, V, DependencyNode, Change
@@ -31,7 +31,7 @@ class ComputeGraph:
             return self._nodes[node_id]
 
     def add_dependency(
-            self, dependent: "ComputedCollection", dependency: "ComputedCollection"
+        self, dependent: "ComputedCollection", dependency: "ComputedCollection"
     ) -> None:
         with self._lock:
             dep_node = self._nodes[dependency.name]
@@ -44,7 +44,7 @@ class ComputeGraph:
                 dependent_node.dependencies.append(dependency.name)
 
     def remove_dependency(
-            self, dependent: "ComputedCollection", dependency: "ComputedCollection"
+        self, dependent: "ComputedCollection", dependency: "ComputedCollection"
     ) -> None:
         with self._lock:
             dep_node = self._nodes[dependency.name]
@@ -197,7 +197,7 @@ class ComputedCollection(Collection[K, V]):
         self._compute_func: Optional[Callable[[], Dict[K, V]]] = None
 
     def add_change_callback(
-            self, instance_id: str, callback: Callable[[Change[K, V]], None]
+        self, instance_id: str, callback: Callable[[Change[K, V]], None]
     ) -> None:
         self._dependency_node.change_callbacks[instance_id] = callback
 
@@ -236,9 +236,7 @@ class ComputedCollection(Collection[K, V]):
 
         # Handle deletions
         for key in old_keys - new_keys:
-            changes.append(
-                Change(key=key, old_value=self._data[key], new_value=None)
-            )
+            changes.append(Change(key=key, old_value=self._data[key], new_value=None))
             del self._data[key]
 
         # Handle updates and additions
@@ -253,22 +251,42 @@ class ComputedCollection(Collection[K, V]):
 
         return changes
 
-    def map(self, mapper) -> "ComputedCollection[K2, V2]":
+    def map(
+        self, mapper_class: Type, *args: Any, **kwargs: Any
+    ) -> "ComputedCollection[K2, V2]":
         """
         Creates a new computed collection by applying a mapper to this collection.
 
         Args:
-            mapper: A Mapper instance that defines the transformation
+            mapper_class: The mapper class (not an instance) to use for the transformation
+            *args: Positional arguments to pass to the mapper constructor
+            **kwargs: Keyword arguments to pass to the mapper constructor
 
         Returns:
             A new ComputedCollection containing the mapped data
         """
-
-        # Generate a name
-        name = f"{self.name}_mapped_{id(mapper)}"
+        # Generate a name for the new collection
+        name = f"{self.name}_mapped_{id(mapper_class)}"
 
         # Create the new computed collection
         result = ComputedCollection[K2, V2](name, self._compute_graph)
+
+        # Add this collection as a dependency
+        self._compute_graph.add_dependency(result, self)
+
+        # Check for ComputedCollection dependencies in args and kwargs
+        for arg in args:
+            if isinstance(arg, ComputedCollection):
+                self._compute_graph.add_dependency(result, arg)
+                print(f"Added dependency: {result.name} depends on {arg.name}")
+
+        for arg in kwargs.values():
+            if isinstance(arg, ComputedCollection):
+                self._compute_graph.add_dependency(result, arg)
+                print(f"Added dependency: {result.name} depends on {arg.name}")
+
+        # Instantiate the mapper with the provided arguments
+        mapper = mapper_class(*args, **kwargs)
 
         # Define the compute function
         def compute_func() -> dict[K2, V2]:
@@ -278,8 +296,7 @@ class ComputedCollection(Collection[K, V]):
                     new_data[mapped_key] = mapped_value
             return new_data
 
-        # Set the compute function and add the dependency
+        # Set the compute function
         result.set_compute_func(compute_func)
-        self._compute_graph.add_dependency(result, self)
 
         return result
