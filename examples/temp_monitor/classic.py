@@ -80,7 +80,6 @@ async def main():
     readings = ComputedCollection[str, List[SensorReading]](
         "sensor_readings", service.compute_graph
     )
-    service.add_collection("sensor_readings", readings)
 
     # Create and add resource
     monitor = TemperatureMonitorResource(
@@ -112,6 +111,8 @@ async def main():
 
                 print("New reading - Sensor:", sensor_id, reading.temperature)
             await asyncio.sleep(2)
+
+    service_task, simulation_task = None, None
 
     try:
         # Create tasks for both the service and simulation
