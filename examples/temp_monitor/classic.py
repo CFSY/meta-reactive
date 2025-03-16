@@ -58,7 +58,7 @@ class TemperatureMonitorResource(Resource[str, dict]):
         self.readings: ComputedCollection = readings_collection
         print("RESOURCE INIT:", self.name)
 
-    def create_collection(self, params: MonitorParams):
+    def setup_resource_collection(self, params: MonitorParams):
         # First, compute average temperatures using the new map method
         averages = self.readings.map(
             AverageTemperatureMapper(), f"{self.name}_averages"

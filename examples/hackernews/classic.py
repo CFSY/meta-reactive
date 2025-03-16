@@ -4,7 +4,11 @@ from typing import List
 
 from pydantic import BaseModel
 
-from src.reactive_framework.classic.mapper import OneToOneMapper, ManyToOneMapper, create_mapped_collection
+from src.reactive_framework.classic.mapper import (
+    OneToOneMapper,
+    ManyToOneMapper,
+    create_mapped_collection,
+)
 from src.reactive_framework.classic.resource import Resource, ResourceParams
 from src.reactive_framework.classic.service import Service
 from src.reactive_framework.external.postgres import PostgresAdapter, PostgresConfig
@@ -19,10 +23,12 @@ class Post(BaseModel):
     created_at: datetime
     score: int = 0
 
+
 class User(BaseModel):
     id: int
     username: str
     karma: int = 0
+
 
 class Vote(BaseModel):
     id: int
@@ -30,10 +36,12 @@ class Vote(BaseModel):
     user_id: int
     created_at: datetime
 
+
 # Mappers
 class PostScoreMapper(ManyToOneMapper[int, Vote, int]):
     def map_values(self, votes: List[Vote]) -> int:
         return len(votes)
+
 
 class EnrichedPostMapper(OneToOneMapper[int, Post, dict]):
     def __init__(self, users_collection):
@@ -47,13 +55,15 @@ class EnrichedPostMapper(OneToOneMapper[int, Post, dict]):
             "url": post.url,
             "score": post.score,
             "author": author.username if author else "unknown",
-            "created_at": post.created_at.isoformat()
+            "created_at": post.created_at.isoformat(),
         }
+
 
 # Resource Parameters
 class TopPostsParams(ResourceParams):
     limit: int = 10
     min_score: int = 0
+
 
 # Resource Implementation
 class TopPostsResource(Resource[int, dict]):
@@ -63,20 +73,17 @@ class TopPostsResource(Resource[int, dict]):
         posts_collection,
         votes_collection,
         users_collection,
-        compute_graph
+        compute_graph,
     ):
         super().__init__(name, TopPostsParams, compute_graph)
         self.posts = posts_collection
         self.votes = votes_collection
         self.users = users_collection
 
-    def create_collection(self, params: TopPostsParams):
+    def setup_resource_collection(self, params: TopPostsParams):
         # Create intermediate collections for vote counting
         post_scores = create_mapped_collection(
-            self.votes,
-            PostScoreMapper(),
-            self.compute_graph,
-            f"{self.name}_scores"
+            self.votes, PostScoreMapper(), self.compute_graph, f"{self.name}_scores"
         )
 
         # Update post scores
@@ -94,7 +101,7 @@ class TopPostsResource(Resource[int, dict]):
             self.posts,
             EnrichedPostMapper(self.users),
             self.compute_graph,
-            f"{self.name}_enriched"
+            f"{self.name}_enriched",
         )
 
         return enriched_posts
@@ -104,36 +111,24 @@ class TopPostsResource(Resource[int, dict]):
         self.compute_graph.add_dependency(collection, self.votes)
         self.compute_graph.add_dependency(collection, self.users)
 
+
 async def main():
     # Initialize PostgreSQL adapter
-    pg_adapter = PostgresAdapter(PostgresConfig(
-        host="localhost",
-        database="hackernews",
-        user="postgres",
-        password="password"
-    ))
+    pg_adapter = PostgresAdapter(
+        PostgresConfig(
+            host="localhost",
+            database="hackernews",
+            user="postgres",
+            password="password",
+        )
+    )
 
     # Create collections from database tables
-    posts_collection = pg_adapter.create_collection(
-        "posts",
-        "posts",
-        "id",
-        Post
-    )
+    posts_collection = pg_adapter.create_collection("posts", "posts", "id", Post)
 
-    users_collection = pg_adapter.create_collection(
-        "users",
-        "users",
-        "id",
-        User
-    )
+    users_collection = pg_adapter.create_collection("users", "users", "id", User)
 
-    votes_collection = pg_adapter.create_collection(
-        "votes",
-        "votes",
-        "id",
-        Vote
-    )
+    votes_collection = pg_adapter.create_collection("votes", "votes", "id", Vote)
 
     # Initialize service
     service = Service("hackernews", host="localhost", port=8080)
@@ -149,7 +144,7 @@ async def main():
         posts_collection,
         votes_collection,
         users_collection,
-        service.compute_graph
+        service.compute_graph,
     )
     service.add_resource("top_posts", top_posts)
 
@@ -162,6 +157,7 @@ async def main():
             await asyncio.sleep(1)
     except KeyboardInterrupt:
         await service.stop()
+
 
 if __name__ == "__main__":
     asyncio.run(main())
