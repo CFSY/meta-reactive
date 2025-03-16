@@ -1,8 +1,7 @@
-import hashlib
 import logging
 import threading
 from datetime import datetime
-from typing import Dict, Set, Optional, TypeVar, Callable, List, Tuple, Iterator, Generic
+from typing import Dict, Set, Optional, TypeVar, Callable, List, Tuple
 
 from .collection import Collection
 from .types import K, V, DependencyNode, Change
@@ -253,16 +252,6 @@ class ComputedCollection(Collection[K, V]):
                 self._data[key] = new_value
 
         return changes
-
-    def _generate_cache_key(self) -> str:
-        node = self._compute_graph.get_node_status(self.name)
-        components = []
-        for dep_id in node.dependencies:
-            dep_collection = self._compute_graph.get_collection(dep_id)
-            components.append(f"{dep_id}:{dep_collection._last_modified.timestamp()}")
-
-        key_string = "|".join(components)
-        return hashlib.sha256(key_string.encode()).hexdigest()
 
     def map(self, mapper, name: str = None) -> "ComputedCollection[K2, V2]":
         """
