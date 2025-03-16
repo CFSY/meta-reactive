@@ -36,7 +36,6 @@ class Service:
             resource = self.resources[resource_name]
 
             try:
-                # TODO: resource manager should take the resource and call instantiate instead of taking a collection
                 collection = resource.instantiate(params)
                 instance_id = await self.resource_manager.create_instance(
                     resource_name, params, collection
