@@ -21,7 +21,6 @@ class Resource(Generic[K, V]):
 
     # Think of this as a collection factory configured by params
     def instantiate(self, params: Dict[str, Any]) -> ComputedCollection[K, V]:
-        print("INSTANTIATING RESOURCE:", self.name)
         # Validate parameters
         validated_params = self.param_model.model_validate(params)
 

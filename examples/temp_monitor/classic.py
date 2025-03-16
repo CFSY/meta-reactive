@@ -67,7 +67,6 @@ class TemperatureMonitorResource(Resource[str, dict]):
         super().__init__(name, MonitorParams, compute_graph)
         self.readings = readings_collection
         self.location_references = location_references
-        print("RESOURCE INIT:", self.name)
 
     def setup_resource_collection(self, params: MonitorParams):
         # Compute average temperatures

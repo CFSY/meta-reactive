@@ -67,7 +67,6 @@ class ComputeGraph:
             def _invalidate_recursive(current_node_id: str) -> None:
                 node = self._nodes[current_node_id]
                 if not node.invalidated:
-                    print("GRAPH INVALIDATING:", node.id)
                     node.invalidated = True
                     invalidated.add(current_node_id)
 
@@ -87,11 +86,9 @@ class ComputeGraph:
         with self._lock:
             # Avoid nested coordinated updates
             if self._coordinated_update_in_progress:
-                print("COORDINATED UPDATE ALREADY IN PROGRESS")
                 return
 
             try:
-                print("START COORDINATED UPDATE")
                 self._coordinated_update_in_progress = True
 
                 # First, invalidate the node and all its dependents
@@ -100,8 +97,6 @@ class ComputeGraph:
                 # Get a topologically sorted list of invalidated nodes to compute
                 # We need to compute in reverse dependency order (dependencies before dependents)
                 sorted_nodes = self._topological_sort(invalidated_nodes)
-
-                print("SORTED NODES:", sorted_nodes)
 
                 # Collect all changes during computation to notify later
                 all_changes: List[Tuple[str, List[Change]]] = []
@@ -167,13 +162,11 @@ class ComputeGraph:
         self._computation_in_progress.add(node_id)
         try:
             # Compute this node
-            print("COMPUTING NODE:", node_id)
             changes = collection.compute()  # type: ignore
 
             node.invalidated = False
             node.last_computed = datetime.now()
 
-            print(f"COMPUTED CHANGES FOR {node.id}: {changes}")
             return changes
         finally:
             self._computation_in_progress.remove(node_id)
@@ -211,7 +204,6 @@ class ComputedCollection(Collection[K, V]):
             callback(change)
 
     def handle_change(self, change: Change[K, V]) -> None:
-        print("HANDLE CHANGE", self.name, change.old_value, "=>", change.new_value)
         # Start coordinated re-computation
         self._compute_graph.recompute_invalidated(self.name)
 
@@ -220,10 +212,7 @@ class ComputedCollection(Collection[K, V]):
 
     def compute(self) -> Optional[List[Change]]:
         if self._compute_func is None:
-            print("NOTHING TO COMPUTE:", self.name)
             return None
-
-        print("ACTUAL COMPUTE:", self.name)
 
         changes: list[Change[K, V]] = []
 
@@ -278,12 +267,10 @@ class ComputedCollection(Collection[K, V]):
         for arg in args:
             if isinstance(arg, ComputedCollection):
                 self._compute_graph.add_dependency(result, arg)
-                print(f"Added dependency: {result.name} depends on {arg.name}")
 
         for arg in kwargs.values():
             if isinstance(arg, ComputedCollection):
                 self._compute_graph.add_dependency(result, arg)
-                print(f"Added dependency: {result.name} depends on {arg.name}")
 
         # Instantiate the mapper with the provided arguments
         mapper = mapper_class(*args, **kwargs)
