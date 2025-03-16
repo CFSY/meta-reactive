@@ -123,7 +123,6 @@ async def main():
         await asyncio.gather(service_task, simulation_task)
     except KeyboardInterrupt:
         simulation_task.cancel()
-        await service.stop()
 
 
 if __name__ == "__main__":

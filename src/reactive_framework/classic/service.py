@@ -83,10 +83,6 @@ class Service:
         self.resources[name] = resource
 
     async def start(self) -> None:
-        await self.resource_manager.start()
         config = Config()
         config.bind = [f"{self.host}:{self.port}"]
         await serve(self.app, config)
-
-    async def stop(self) -> None:
-        await self.resource_manager.stop()

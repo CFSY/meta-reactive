@@ -2,7 +2,7 @@ import asyncio
 import logging
 import uuid
 import weakref
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, Optional, Any
 
 from .compute_graph import ComputedCollection
@@ -16,40 +16,6 @@ class ResourceManager:
         self._instances: Dict[str, ResourceInstance] = {}
         self._collections: Dict[str, ComputedCollection] = {}
         self._subscribers: Dict[str, set[weakref.ref[asyncio.Queue]]] = {}
-        self._cleanup_task: Optional[asyncio.Task] = None
-        self._cleanup_interval = timedelta(minutes=5)
-
-    async def start(self) -> None:
-        self._cleanup_task = asyncio.create_task(self._cleanup_loop())
-
-    async def stop(self) -> None:
-        if self._cleanup_task:
-            self._cleanup_task.cancel()
-            try:
-                await self._cleanup_task
-            except asyncio.CancelledError:
-                pass
-
-    async def _cleanup_loop(self) -> None:
-        while True:
-            try:
-                await asyncio.sleep(self._cleanup_interval.total_seconds())
-                await self._cleanup_inactive_instances()
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                logger.error(f"Error in cleanup loop: {e}")
-
-    async def _cleanup_inactive_instances(self) -> None:
-        now = datetime.now()
-        to_remove = []
-
-        for instance_id, instance in self._instances.items():
-            if now - instance.last_accessed > self._cleanup_interval:
-                to_remove.append(instance_id)
-
-        for instance_id in to_remove:
-            await self.destroy_instance(instance_id)
 
     async def create_instance(
         self, resource_name: str, params: Dict[str, Any], collection: ComputedCollection
@@ -83,7 +49,7 @@ class ResourceManager:
 
         # Add subscriber
         self._subscribers[instance_id].add(
-            weakref.ref(queue, lambda ref: self._cleanup_subscriber(instance_id, ref))
+            weakref.ref(queue, lambda ref: self._remove_subscriber(instance_id, ref))
         )
 
         # Send initial data
@@ -100,7 +66,7 @@ class ResourceManager:
 
         collection.add_change_callback(instance_id, on_change)
 
-    def _cleanup_subscriber(self, instance_id: str, ref: weakref.ref) -> None:
+    def _remove_subscriber(self, instance_id: str, ref: weakref.ref) -> None:
         if instance_id in self._subscribers:
             self._subscribers[instance_id].discard(ref)
 
