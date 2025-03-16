@@ -253,21 +253,19 @@ class ComputedCollection(Collection[K, V]):
 
         return changes
 
-    def map(self, mapper, name: str = None) -> "ComputedCollection[K2, V2]":
+    def map(self, mapper) -> "ComputedCollection[K2, V2]":
         """
         Creates a new computed collection by applying a mapper to this collection.
 
         Args:
             mapper: A Mapper instance that defines the transformation
-            name: Optional name for the resulting collection. If not provided,
-                  a name will be generated based on this collection's name.
 
         Returns:
             A new ComputedCollection containing the mapped data
         """
-        # Generate a name if not provided
-        if name is None:
-            name = f"{self.name}_mapped_{id(mapper)}"
+
+        # Generate a name
+        name = f"{self.name}_mapped_{id(mapper)}"
 
         # Create the new computed collection
         result = ComputedCollection[K2, V2](name, self._compute_graph)

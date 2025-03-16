@@ -60,14 +60,10 @@ class TemperatureMonitorResource(Resource[str, dict]):
 
     def setup_resource_collection(self, params: MonitorParams):
         # First, compute average temperatures using the new map method
-        averages = self.readings.map(
-            AverageTemperatureMapper(), f"{self.name}_averages"
-        )
+        averages = self.readings.map(AverageTemperatureMapper())
 
         # Then, generate alerts based on averages using the new map method
-        alerts = averages.map(
-            TemperatureAlertMapper(params.threshold), f"{self.name}_alerts"
-        )
+        alerts = averages.map(TemperatureAlertMapper(params.threshold))
 
         return alerts
 
