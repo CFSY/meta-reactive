@@ -57,11 +57,10 @@ class EnhancedAlertMapper(OneToOneMapper[str, Tuple[float, str], Dict[str, str]]
 
         # Get reference data for this location
         location_info = self.location_references.get(location)
+        min_temp, max_temp = location_info.min_temp, location_info.max_temp
 
         alert_level = "normal"
-        details = f"Temperature {avg_temp:.1f}°C is within normal range"
-
-        min_temp, max_temp = location_info.min_temp, location_info.max_temp
+        details = f"Temperature {avg_temp:.1f}°C is within normal range ({min_temp:.1f}-{max_temp:.1f}°C) for {location}"
 
         # Check if temperature is outside the expected range
         if avg_temp < min_temp:
@@ -137,7 +136,7 @@ async def main():
     )
     location_references.set(
         "warehouse",
-        LocationInfo(min_temp=15.0, max_temp=30.0, description="Warehouse area"),
+        LocationInfo(min_temp=20.0, max_temp=30.0, description="Warehouse area"),
     )
 
     # Create and add resource
@@ -161,13 +160,13 @@ async def main():
                 # Add location-specific variations
                 if location == "server_room":
                     # Server room runs cooler normally, but can spike
-                    if random.random() < 0.5:  # 50% chance of spike
+                    if random.random() < 0.3:  # 30% chance of spike
                         temp = random.uniform(25.0, 35.0)  # Temperature spike
                     else:
-                        temp = random.uniform(19.0, 22.0)  # Normal range
+                        temp = random.uniform(18.0, 22.0)  # Normal range
                 elif location == "warehouse":
                     # Warehouse has wider temperature swings
-                    temp = random.uniform(14.0, 32.0)
+                    temp = random.uniform(10.0, 40.0)
                 else:
                     # Office has more consistent temperature
                     temp = random.uniform(19.0, 26.0)
@@ -199,21 +198,21 @@ async def main():
             if random.random() < 0.5:  # 50% chance each cycle
                 location = random.choice(["office", "server_room", "warehouse"])
                 current = location_references.get(location)
-                if current:
-                    # Slight adjustment to expected temperature ranges
-                    new_min = max(10, current.min_temp + random.uniform(-1, 1))
-                    new_max = max(new_min + 2, current.max_temp + random.uniform(-1, 1))
-                    location_references.set(
-                        location,
-                        LocationInfo(
-                            min_temp=new_min,
-                            max_temp=new_max,
-                            description=current.description,
-                        ),
-                    )
-                    print(
-                        f"Updated reference data for {location}: {new_min:.1f}-{new_max:.1f}°C"
-                    )
+
+                # Slight adjustment to expected temperature ranges
+                new_min = max(10, current.min_temp + random.uniform(-1, 1))
+                new_max = max(new_min + 2, current.max_temp + random.uniform(-1, 1))
+                location_references.set(
+                    location,
+                    LocationInfo(
+                        min_temp=new_min,
+                        max_temp=new_max,
+                        description=current.description,
+                    ),
+                )
+                print(
+                    f"Updated reference data for {location}: {new_min:.1f}-{new_max:.1f}°C"
+                )
 
             await asyncio.sleep(2)
 
