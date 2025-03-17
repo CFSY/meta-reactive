@@ -8,6 +8,7 @@ from ..core.types import K, V
 
 class ResourceParams(BaseModel):
     """Base class for resource parameters"""
+
     pass
 
 
@@ -29,6 +30,8 @@ class Resource(Generic[K, V]):
 
         return collection
 
-    def setup_resource_collection(self, params: ResourceParams) -> ComputedCollection[K, V]:
+    def setup_resource_collection(
+        self, params: ResourceParams
+    ) -> ComputedCollection[K, V]:
         """Override this in derived classes to set up the resource's computed collection"""
         raise NotImplementedError
