@@ -1,13 +1,9 @@
 from typing import Dict
 
-from .detector import FrameworkDetector
+from .common import FrameworkClass
 from .resource import Resource
 from ..classic.service import Service as ClassicService
 from ..core.compute_graph import ComputedCollection
-
-# Create a framework detector for the meta API
-detector = FrameworkDetector("reactive_meta")
-FrameworkClass = detector.get_metaclass()
 
 
 class Service(metaclass=FrameworkClass):

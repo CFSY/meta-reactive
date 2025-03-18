@@ -3,15 +3,10 @@ from typing import Any, Callable, Generic, Optional, Type, get_type_hints
 
 from pydantic import BaseModel, create_model
 
-from .detector import FrameworkDetector
+from .common import FrameworkClass, framework_function
 from ..classic.resource import Resource as ClassicResource, ResourceParams
 from ..core.compute_graph import ComputedCollection
 from ..core.types import K, V
-
-# Create a framework detector for the meta API
-detector = FrameworkDetector("reactive_meta")
-framework_function = detector.get_function_decorator()
-FrameworkClass = detector.get_metaclass()
 
 
 class Resource(Generic[K, V], metaclass=FrameworkClass):

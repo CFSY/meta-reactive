@@ -8,17 +8,13 @@ from typing import (
     TypeVar,
 )
 
-from .detector import FrameworkDetector
+from .common import detector, framework_function
 from ..classic.mapper import (
     Mapper as ClassicMapper,
     OneToOneMapper as ClassicOneToOneMapper,
     ManyToOneMapper as ClassicManyToOneMapper,
 )
 from ..core.compute_graph import ComputedCollection
-
-# Create a framework detector for the meta API
-detector = FrameworkDetector("reactive_meta")
-framework_function = detector.get_function_decorator()
 
 K1 = TypeVar("K1")
 V1 = TypeVar("V1")
