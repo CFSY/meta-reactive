@@ -1,7 +1,5 @@
-from typing import Dict
-
 from .common import FrameworkClass
-from .resource import Resource
+from .resource import Resource, global_resource_registry
 from ..classic.service import Service as ClassicService
 
 
@@ -15,17 +13,8 @@ class Service(metaclass=FrameworkClass):
         self.host = host
         self.port = port
         self._classic_service = ClassicService(name, host, port)
-        self._resources: Dict[str, Resource] = {}
 
-    # TODO: This should be handled internally by the framework and not by the user
-    def add_resource(self, name: str, resource: Resource) -> None:
-        """
-        Add a resource to the service.
-
-        Args:
-            name: The name of the resource
-            resource: The resource instance
-        """
+    def _add_resource(self, name: str, resource: Resource) -> None:
         # Initialize the classic resource with our compute graph
         classic_resource = resource.create_classic_resource(
             self._classic_service.compute_graph
@@ -34,11 +23,13 @@ class Service(metaclass=FrameworkClass):
         # Add the resource to the classic service
         self._classic_service.add_resource(name, classic_resource)
 
-        # Keep track of the resource
-        self._resources[name] = resource
-
     async def start(self) -> None:
         """Start the service"""
+
+        # Register the resources on startup
+        for resource_name, resource in global_resource_registry.items():
+            self._add_resource(resource_name, resource)
+
         await self._classic_service.start()
 
     @property

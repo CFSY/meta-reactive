@@ -8,6 +8,8 @@ from ..classic.resource import Resource as ClassicResource, ResourceParams
 from ..core.compute_graph import ComputedCollection
 from ..core.types import K, V
 
+global_resource_registry: dict[str, "Resource"] = {}
+
 
 class Resource(Generic[K, V], metaclass=FrameworkClass):
     """
@@ -71,6 +73,10 @@ def resource(name: Optional[str] = None, param_model: Optional[Type[BaseModel]] 
     def decorator(func):
         # Get the resource name from the function name if not provided
         resource_name = name or func.__name__
+        if resource_name in global_resource_registry:
+            raise ValueError(
+                "Resource name already registered, resource names must be globally unique."
+            )
 
         # If no param_model is provided, try to create one from function parameters
         actual_param_model = param_model
@@ -108,6 +114,9 @@ def resource(name: Optional[str] = None, param_model: Optional[Type[BaseModel]] 
 
         # Register the setup method
         resource_instance.setup(func)
+
+        # Register the resource
+        global_resource_registry[resource_name] = resource_instance
 
         return resource_instance
 

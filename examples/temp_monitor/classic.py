@@ -99,10 +99,10 @@ async def main():
         location_references.set(location, info)
 
     # Create and add resource
-    monitor = TemperatureMonitorResource(
+    temperature_monitor = TemperatureMonitorResource(
         readings, location_references, service.compute_graph
     )
-    service.add_resource("monitor", monitor)
+    service.add_resource("temperature_monitor", temperature_monitor)
 
     # Define reading updater function for the simulation
     async def update_reading(sensor_id: str, location: str, temp: float):

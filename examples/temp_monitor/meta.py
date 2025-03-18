@@ -77,9 +77,6 @@ location_references = ComputedCollection[str, LocationInfo](
 for loc, info in DEFAULT_LOCATIONS.items():
     location_references.set(loc, info)
 
-# Register the resource with the service
-service.add_resource("monitor", temperature_monitor)
-
 
 async def main():
     # Define reading updater function for the simulation

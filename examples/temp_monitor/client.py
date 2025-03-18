@@ -38,7 +38,8 @@ async def run_client():
             # Create stream
             print("Creating stream...")
             async with session.post(
-                "http://localhost:1234/v1/streams/monitor", json={"threshold": 40.0}
+                "http://localhost:1234/v1/streams/temperature_monitor",
+                json={"threshold": 40.0},
             ) as response:
                 stream_data = await response.json()
                 stream_id = stream_data["instance_id"]
