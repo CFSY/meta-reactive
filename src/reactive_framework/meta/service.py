@@ -12,7 +12,6 @@ class Service(metaclass=FrameworkClass):
     """
 
     def __init__(self, name: str, host: str = "localhost", port: int = 8080):
-        self.name = name
         self.host = host
         self.port = port
         self._classic_service = ClassicService(name, host, port)

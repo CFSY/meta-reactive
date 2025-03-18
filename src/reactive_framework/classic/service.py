@@ -15,7 +15,6 @@ logger = logging.getLogger(__name__)
 
 class Service:
     def __init__(self, name: str, host: str = "localhost", port: int = 8080):
-        self.name = name
         self.host = host
         self.port = port
         self.compute_graph = ComputeGraph()
