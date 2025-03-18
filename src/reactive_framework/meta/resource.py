@@ -28,9 +28,7 @@ class Resource(Generic[K, V], metaclass=FrameworkClass):
     def create_classic_resource(self, compute_graph):
         """Create the underlying classic resource when compute_graph is available"""
         if self._classic_resource is None and compute_graph is not None:
-            self._classic_resource = ClassicResource(
-                self.name, self.param_model, compute_graph
-            )
+            self._classic_resource = ClassicResource(self.param_model, compute_graph)
             # Override the setup method to use our implementation
             self._classic_resource.setup_resource_collection = (
                 self._setup_resource_collection

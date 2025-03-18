@@ -61,10 +61,8 @@ class MonitorParams(ResourceParams):
 
 # Resource Implementation
 class TemperatureMonitorResource(Resource[str, dict]):
-    def __init__(
-        self, name: str, readings_collection, location_references, compute_graph
-    ):
-        super().__init__(name, MonitorParams, compute_graph)
+    def __init__(self, readings_collection, location_references, compute_graph):
+        super().__init__(MonitorParams, compute_graph)
         self.readings = readings_collection
         self.location_references = location_references
 
@@ -102,7 +100,7 @@ async def main():
 
     # Create and add resource
     monitor = TemperatureMonitorResource(
-        "temperature_monitor", readings, location_references, service.compute_graph
+        readings, location_references, service.compute_graph
     )
     service.add_resource("monitor", monitor)
 

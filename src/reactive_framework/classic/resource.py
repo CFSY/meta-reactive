@@ -13,10 +13,7 @@ class ResourceParams(BaseModel):
 
 
 class Resource(Generic[K, V]):
-    def __init__(
-        self, name: str, param_model: type[ResourceParams], compute_graph: ComputeGraph
-    ):
-        self.name = name
+    def __init__(self, param_model: type[ResourceParams], compute_graph: ComputeGraph):
         self.param_model = param_model
         self.compute_graph = compute_graph
 
