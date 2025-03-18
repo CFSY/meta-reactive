@@ -1,3 +1,4 @@
+from enum import Enum
 from functools import wraps
 from typing import (
     Callable,
@@ -22,6 +23,11 @@ K2 = TypeVar("K2")
 V2 = TypeVar("V2")
 
 
+class MapperType(Enum):
+    ONE_TO_ONE = 1
+    MANY_TO_ONE = 2
+
+
 class MapperWrapper(Generic[K1, V1, K2, V2]):
     """
     Wrapper class for mappers that handles dependency detection and
@@ -31,7 +37,7 @@ class MapperWrapper(Generic[K1, V1, K2, V2]):
     def __init__(
         self,
         mapper_func: Callable,
-        mapper_type: str,
+        mapper_type: MapperType,
     ):
         self.mapper_func = mapper_func
         self.mapper_type = mapper_type
@@ -78,12 +84,12 @@ class MapperWrapper(Generic[K1, V1, K2, V2]):
     def create_mapper(self, *args, **kwargs) -> ClassicMapper:
         """Create an instance of the classic mapper with the detected dependencies"""
         # Determine the mapper class based on the type
-        if self.mapper_type == "one_to_one":
+        if self.mapper_type == MapperType.ONE_TO_ONE:
             mapper_class = _OneToOneMapperImpl
-        elif self.mapper_type == "many_to_one":
+        elif self.mapper_type == MapperType.MANY_TO_ONE:
             mapper_class = _ManyToOneMapperImpl
         else:
-            raise ValueError(f"Unknown mapper type: {self.mapper_type}")
+            raise ValueError(f"Unsupported mapper type: {self.mapper_type}")
 
         # Combine explicitly provided dependencies with detected ones
         all_args = list(args)
@@ -98,12 +104,12 @@ class MapperWrapper(Generic[K1, V1, K2, V2]):
 
 
 @framework_function
-def mapper(mapper_type: str = "one_to_one"):
+def mapper(mapper_type: MapperType = MapperType.ONE_TO_ONE):
     """
     Decorator to create a mapper function.
 
     Args:
-        mapper_type: Type of mapper ("one_to_one" or "many_to_one")
+        mapper_type: Type of mapper
 
     Returns:
         A decorator function that creates a MapperWrapper instance.
@@ -129,7 +135,7 @@ def one_to_one(func):
     Returns:
         A MapperWrapper instance.
     """
-    wrapper = MapperWrapper(func, "one_to_one")
+    wrapper = MapperWrapper(func, MapperType.ONE_TO_ONE)
     # Preserve the original function attributes
     wraps(func)(wrapper)
     return wrapper
@@ -146,7 +152,7 @@ def many_to_one(func):
     Returns:
         A MapperWrapper instance.
     """
-    wrapper = MapperWrapper(func, "many_to_one")
+    wrapper = MapperWrapper(func, MapperType.MANY_TO_ONE)
     # Preserve the original function attributes
     wraps(func)(wrapper)
     return wrapper
@@ -198,10 +204,12 @@ def map_collection(
     mapper_wrapper: MapperWrapper = mapper
 
     # Determine the mapper class to use with the classic API
-    if mapper_wrapper.mapper_type == "one_to_one":
+    if mapper_wrapper.mapper_type == MapperType.ONE_TO_ONE:
         mapper_class = _OneToOneMapperImpl
-    else:
+    elif mapper_wrapper.mapper_type == MapperType.MANY_TO_ONE:
         mapper_class = _ManyToOneMapperImpl
+    else:
+        raise ValueError(f"Unsupported mapper type: {mapper_wrapper.mapper_type}")
 
     # Use the classic map method with the correct mapper class and function
     return collection.map(
