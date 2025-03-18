@@ -61,10 +61,10 @@ class MonitorParams(ResourceParams):
 
 # Resource Implementation
 class TemperatureMonitorResource(Resource[str, dict]):
-    def __init__(self, readings_collection, location_references, compute_graph):
+    def __init__(self, readings_collection, location_ref_collection, compute_graph):
         super().__init__(MonitorParams, compute_graph)
         self.readings = readings_collection
-        self.location_references = location_references
+        self.location_references = location_ref_collection
 
     def setup_resource_collection(self, params: MonitorParams):
         # Compute average temperatures
@@ -85,22 +85,22 @@ async def main():
     service = Service("temperature_monitor", port=1234)
 
     # Create a collection for sensor readings
-    readings = ComputedCollection[str, List[SensorReading]](
+    readings_collection = ComputedCollection[str, List[SensorReading]](
         "sensor_readings", service.compute_graph
     )
 
     # Create a collection for location reference data
-    location_references = ComputedCollection[str, LocationInfo](
+    location_ref_collection = ComputedCollection[str, LocationInfo](
         "location_references", service.compute_graph
     )
 
     # Populate location reference data with defaults
     for location, info in DEFAULT_LOCATIONS.items():
-        location_references.set(location, info)
+        location_ref_collection.set(location, info)
 
     # Create and add resource
     temperature_monitor = TemperatureMonitorResource(
-        readings, location_references, service.compute_graph
+        readings_collection, location_ref_collection, service.compute_graph
     )
     service.add_resource("temperature_monitor", temperature_monitor)
 
@@ -113,7 +113,7 @@ async def main():
             timestamp=datetime.now(),
         )
 
-        old_readings = readings.get(sensor_id)
+        old_readings = readings_collection.get(sensor_id)
 
         # Create new readings list
         if old_readings is None:
@@ -123,11 +123,11 @@ async def main():
             # Keep only the latest 10 readings
             new_readings = new_readings[-10:]
 
-        readings.set(sensor_id, new_readings)
+        readings_collection.set(sensor_id, new_readings)
 
     # Define location updater function
     async def update_location(location: str, info: LocationInfo):
-        location_references.set(location, info)
+        location_ref_collection.set(location, info)
 
     service_task, simulation_task = None, None
 
