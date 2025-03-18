@@ -40,7 +40,7 @@ def enhanced_alert(value: Tuple[float, str], global_threshold: float) -> Dict[st
     avg_temp, location = value
 
     # Get reference data for this location
-    location_info = location_references.get(location)
+    location_info = location_ref_collection.get(location)
 
     # Use common evaluation logic
     return evaluate_temperature_alert(
@@ -52,7 +52,7 @@ def enhanced_alert(value: Tuple[float, str], global_threshold: float) -> Dict[st
 @resource
 def temperature_monitor(threshold: float):
     # Compute average temperatures
-    averages = map_collection(readings, average_temperature)
+    averages = map_collection(readings_collection, average_temperature)
 
     # Generate enhanced alerts using both averages and location references
     alerts = map_collection(averages, enhanced_alert, threshold)
@@ -64,18 +64,18 @@ def temperature_monitor(threshold: float):
 service = Service("temperature_monitor", port=1234)
 
 # Create a collection for sensor readings
-readings = ComputedCollection[str, List[SensorReading]](
+readings_collection = ComputedCollection[str, List[SensorReading]](
     "sensor_readings", service.compute_graph
 )
 
 # Create a collection for location reference data
-location_references = ComputedCollection[str, LocationInfo](
+location_ref_collection = ComputedCollection[str, LocationInfo](
     "location_references", service.compute_graph
 )
 
 # Populate location reference data with defaults
 for loc, info in DEFAULT_LOCATIONS.items():
-    location_references.set(loc, info)
+    location_ref_collection.set(loc, info)
 
 
 async def main():
@@ -88,7 +88,7 @@ async def main():
             timestamp=datetime.now(),
         )
 
-        old_readings = readings.get(sensor_id)
+        old_readings = readings_collection.get(sensor_id)
 
         # Create new readings list
         if old_readings is None:
@@ -98,11 +98,11 @@ async def main():
             # Keep only the latest 10 readings
             new_readings = new_readings[-10:]
 
-        readings.set(sensor_id, new_readings)
+        readings_collection.set(sensor_id, new_readings)
 
     # Define location updater function
     async def update_location(location: str, info: LocationInfo):
-        location_references.set(location, info)
+        location_ref_collection.set(location, info)
 
     service_task, simulation_task = None, None
 
