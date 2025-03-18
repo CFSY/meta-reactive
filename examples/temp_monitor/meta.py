@@ -18,27 +18,12 @@ from src.reactive_framework.meta import (
     map_collection,
 )
 
-# Create a service
-service = Service("temperature_monitor", port=1234)
-
-# Create collections
-readings = ComputedCollection[str, List[SensorReading]](
-    "sensor_readings", service.compute_graph
-)
-
-location_references = ComputedCollection[str, LocationInfo](
-    "location_references", service.compute_graph
-)
-
-# Populate location reference data with defaults
-for location, info in DEFAULT_LOCATIONS.items():
-    location_references.set(location, info)
-
 
 # Define mappers using decorators
 @many_to_one
 def average_temperature(readings: List[SensorReading]) -> Tuple[float, str]:
     """Computes average temperature for each sensor from its readings"""
+
     if not readings:
         return 0.0, ""
     avg_temp = sum(r.temperature for r in readings) / len(readings)
@@ -66,15 +51,6 @@ def enhanced_alert(value: Tuple[float, str], global_threshold: float) -> Dict[st
 # Define resource using decorator
 @resource
 def temperature_monitor(threshold: float):
-    """
-    Temperature monitor resource that tracks sensor readings and generates alerts.
-
-    Args:
-        threshold: Global alert threshold in Celsius
-
-    Returns:
-        A computed collection with temperature alerts
-    """
     # Compute average temperatures
     averages = map_collection(readings, average_temperature)
 
@@ -83,6 +59,23 @@ def temperature_monitor(threshold: float):
 
     return alerts
 
+
+# Create a service
+service = Service("temperature_monitor", port=1234)
+
+# Create a collection for sensor readings
+readings = ComputedCollection[str, List[SensorReading]](
+    "sensor_readings", service.compute_graph
+)
+
+# Create a collection for location reference data
+location_references = ComputedCollection[str, LocationInfo](
+    "location_references", service.compute_graph
+)
+
+# Populate location reference data with defaults
+for loc, info in DEFAULT_LOCATIONS.items():
+    location_references.set(loc, info)
 
 # Register the resource with the service
 service.add_resource("monitor", temperature_monitor)

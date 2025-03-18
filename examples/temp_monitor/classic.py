@@ -18,7 +18,7 @@ from src.reactive_framework.classic.service import Service
 from src.reactive_framework.core.compute_graph import ComputedCollection
 
 
-# Mappers
+# Define mappers
 class AverageTemperatureMapper(ManyToOneMapper[str, SensorReading, Tuple[float, str]]):
     """Computes average temperature for each sensor from its readings"""
 
@@ -54,7 +54,7 @@ class EnhancedAlertMapper(OneToOneMapper[str, Tuple[float, str], Dict[str, str]]
         )
 
 
-# Resource Parameters
+# Define resource
 class MonitorParams(ResourceParams):
     threshold: float  # Global alert threshold in Celsius
 
