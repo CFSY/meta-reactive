@@ -7,7 +7,6 @@ from hypercorn.asyncio import serve
 from quart import Quart, Response, request
 
 from .resource import Resource
-from ..core.collection import Collection
 from ..core.compute_graph import ComputeGraph
 from ..core.resource import ResourceManager
 
@@ -22,7 +21,6 @@ class Service:
         self.compute_graph = ComputeGraph()
         self.resource_manager = ResourceManager()
         self.resources: Dict[str, Resource] = {}
-        self.collections: Dict[str, Collection] = {}
         self.app = Quart(name)
         self._setup_routes()
 

@@ -3,7 +3,6 @@ from typing import Dict
 from .common import FrameworkClass
 from .resource import Resource
 from ..classic.service import Service as ClassicService
-from ..core.compute_graph import ComputedCollection
 
 
 class Service(metaclass=FrameworkClass):
@@ -19,6 +18,7 @@ class Service(metaclass=FrameworkClass):
         self._classic_service = ClassicService(name, host, port)
         self._resources: Dict[str, Resource] = {}
 
+    # TODO: This should be handled internally by the framework and not by the user
     def add_resource(self, name: str, resource: Resource) -> None:
         """
         Add a resource to the service.
@@ -37,15 +37,6 @@ class Service(metaclass=FrameworkClass):
 
         # Keep track of the resource
         self._resources[name] = resource
-
-    def register_collection(self, collection: ComputedCollection) -> None:
-        """
-        Register a collection with the service.
-
-        Args:
-            collection: The collection to register
-        """
-        self._classic_service.collections[collection.name] = collection
 
     async def start(self) -> None:
         """Start the service"""
