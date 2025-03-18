@@ -177,20 +177,26 @@ class _ManyToOneMapperImpl(ClassicManyToOneMapper):
 
 
 def map_collection(
-    collection: ComputedCollection, mapper_wrapper: MapperWrapper, *args, **kwargs
+    collection: ComputedCollection, mapper, *args, **kwargs
 ) -> ComputedCollection:
     """
     Map a collection using a mapper wrapper.
 
     Args:
         collection: The collection to map
-        mapper_wrapper: The mapper wrapper to use
+        mapper: The mapper to use
         *args: Additional arguments to pass to the mapper
         **kwargs: Additional keyword arguments to pass to the mapper
 
     Returns:
         A new computed collection with the mapped data
     """
+    if not isinstance(mapper, MapperWrapper):
+        raise RuntimeError(
+            "The framework failed to recognise the mapper, did you forget to use a mapper decorator?"
+        )
+    mapper_wrapper: MapperWrapper = mapper
+
     # Determine the mapper class to use with the classic API
     if mapper_wrapper.mapper_type == "one_to_one":
         mapper_class = _OneToOneMapperImpl
