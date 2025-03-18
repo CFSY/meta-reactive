@@ -24,15 +24,13 @@ class Resource(Generic[K, V], metaclass=FrameworkClass):
         self,
         name: str,
         param_model: Optional[Type[BaseModel]] = None,
-        compute_graph=None,
     ):
         self.name = name
         self.param_model = param_model or ResourceParams
-        self.compute_graph = compute_graph
         self._classic_resource = None
         self._setup_method = None
 
-    def _create_classic_resource(self, compute_graph):
+    def create_classic_resource(self, compute_graph):
         """Create the underlying classic resource when compute_graph is available"""
         if self._classic_resource is None and compute_graph is not None:
             self._classic_resource = ClassicResource(
@@ -49,7 +47,11 @@ class Resource(Generic[K, V], metaclass=FrameworkClass):
     ) -> ComputedCollection[K, V]:
         """Delegate to the user-defined setup method"""
         if self._setup_method:
-            return self._setup_method(params)
+            # Extract the parameter values from the params object
+            param_dict = params.model_dump() if hasattr(params, "model_dump") else {}
+
+            # Call the setup method with unpacked parameters
+            return self._setup_method(**param_dict)
         raise NotImplementedError(
             "Resource setup method not defined. Use @resource decorator or override setup."
         )
@@ -103,7 +105,7 @@ def resource(name: Optional[str] = None, param_model: Optional[Type[BaseModel]] 
             # Create a Pydantic model for the parameters
             if fields:
                 actual_param_model = create_model(
-                    f"{resource_name.title()}Params", **fields
+                    f"{resource_name.title()}_Params", **fields
                 )
             else:
                 actual_param_model = ResourceParams

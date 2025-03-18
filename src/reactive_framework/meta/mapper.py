@@ -1,5 +1,4 @@
 from functools import wraps
-from functools import wraps
 from typing import (
     Callable,
     Generic,
@@ -196,9 +195,6 @@ def map_collection(
     Returns:
         A new computed collection with the mapped data
     """
-    # Create the mapper instance
-    mapper_instance = mapper_wrapper.create_mapper(*args, **kwargs)
-
     # Determine the mapper class to use with the classic API
     if mapper_wrapper.mapper_type == "one_to_one":
         mapper_class = _OneToOneMapperImpl

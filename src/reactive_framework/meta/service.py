@@ -32,7 +32,7 @@ class Service(metaclass=FrameworkClass):
             resource: The resource instance
         """
         # Initialize the classic resource with our compute graph
-        classic_resource = resource._create_classic_resource(
+        classic_resource = resource.create_classic_resource(
             self._classic_service.compute_graph
         )
 
