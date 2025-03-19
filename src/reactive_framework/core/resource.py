@@ -10,6 +10,15 @@ from .types import ResourceInstance, SSEMessage, Change
 logger = logging.getLogger(__name__)
 
 
+def _get_param_hash(resource_name: str, params: Dict[str, Any]) -> str:
+    """Create a unique identifier based on resource name and parameters"""
+    # Sort params to ensure consistent order
+    sorted_params = dict(sorted(params.items()))
+    # Convert to string representation for hashing
+    param_str = str(sorted_params)
+    return f"{resource_name}:{param_str}"
+
+
 class ResourceManager:
     def __init__(self):
         self._instances: Dict[str, ResourceInstance] = {}
@@ -18,19 +27,11 @@ class ResourceManager:
         # Map to track instances by resource_name and params
         self._instances_by_params: Dict[str, Dict[str, str]] = {}
 
-    def _get_param_hash(self, resource_name: str, params: Dict[str, Any]) -> str:
-        """Create a unique identifier based on resource name and parameters"""
-        # Sort params to ensure consistent order
-        sorted_params = dict(sorted(params.items()))
-        # Convert to string representation for hashing
-        param_str = str(sorted_params)
-        return f"{resource_name}:{param_str}"
-
     async def find_existing_instance(
         self, resource_name: str, params: Dict[str, Any]
     ) -> Optional[str]:
         """Find an existing instance with matching resource name and parameters"""
-        param_hash = self._get_param_hash(resource_name, params)
+        param_hash = _get_param_hash(resource_name, params)
 
         # Check if we have an instance with these params
         if resource_name in self._instances_by_params:
@@ -60,7 +61,7 @@ class ResourceManager:
         self._subscribers[instance_id] = set()
 
         # Store the instance by its parameters
-        param_hash = self._get_param_hash(resource_name, params)
+        param_hash = _get_param_hash(resource_name, params)
         if resource_name not in self._instances_by_params:
             self._instances_by_params[resource_name] = {}
         self._instances_by_params[resource_name][param_hash] = instance_id
@@ -72,7 +73,7 @@ class ResourceManager:
             # Get the resource name and params to remove from param index
             instance = self._instances[instance_id]
             resource_name = instance.resource_name
-            param_hash = self._get_param_hash(resource_name, instance.params)
+            param_hash = _get_param_hash(resource_name, instance.params)
 
             # Remove from instances
             del self._instances[instance_id]

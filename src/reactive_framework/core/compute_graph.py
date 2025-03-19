@@ -95,7 +95,6 @@ class ComputeGraph:
                 invalidated_nodes = self.invalidate_node(starting_node_id)
 
                 # Get a topologically sorted list of invalidated nodes to compute
-                # We need to compute in reverse dependency order (dependencies before dependents)
                 sorted_nodes = self._topological_sort(invalidated_nodes)
 
                 # Collect all changes during computation to notify later
@@ -148,8 +147,7 @@ class ComputeGraph:
     def _compute_single_node(self, node_id: str) -> Optional[List[Change]]:
         """
         Computes a single node without recursion.
-        Assumes all dependencies have already been computed.
-        Returns a list of (collection, change) tuples
+        Returns a list of changes
         """
         node = self._nodes[node_id]
         collection = self._collections[node_id]
@@ -162,7 +160,7 @@ class ComputeGraph:
         self._computation_in_progress.add(node_id)
         try:
             # Compute this node
-            changes = collection.compute()  # type: ignore
+            changes = collection.compute()
 
             node.invalidated = False
             node.last_computed = datetime.now()
@@ -199,7 +197,6 @@ class ComputedCollection(Collection[K, V]):
             del self._dependency_node.change_callbacks[instance_id]
 
     def notify_callbacks(self, change: Change[K, V]) -> None:
-        """Notify only change callbacks"""
         for callback in self._dependency_node.change_callbacks.values():
             callback(change)
 
