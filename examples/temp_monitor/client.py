@@ -20,7 +20,7 @@ def format_alert(data):
 
     reset_color = "\033[0m"
 
-    # Default values if keys are missing
+    # Default values
     location = data.get("location", "unknown")
     temp = data.get("temperature", "N/A")
     alert_level = data.get("alert_level", "normal")
@@ -70,7 +70,7 @@ async def run_client():
                                     try:
                                         data = json.loads(field[5:].strip())
 
-                                        # Handle initial data differently
+                                        # Handle initial data
                                         if (
                                             "event" in message
                                             and "event: init" in message

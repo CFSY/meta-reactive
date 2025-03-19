@@ -53,7 +53,7 @@ def evaluate_temperature_alert(
 
 # Simulation utilities
 def generate_temperature_for_location(location: str) -> float:
-    """Generate realistic temperature data based on location"""
+    """Generate temperature data based on location"""
     if location == "server_room":
         # Server room runs cooler normally, but can spike
         if random.random() < 0.3:  # 30% chance of spike
