@@ -210,7 +210,7 @@ class CodeAnalyzer:
         """
         try:
             source = inspect.getsource(func)
-            source = textwrap.dedent(source)  # Dedent the source code
+            source = textwrap.dedent(source)
             module_globals = inspect.getmodule(func).__dict__
             func_globals = func.__globals__
 

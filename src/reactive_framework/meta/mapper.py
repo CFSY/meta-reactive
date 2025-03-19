@@ -30,7 +30,7 @@ class MapperType(Enum):
 
 class MapperWrapper(Generic[K1, V1, K2, V2]):
     """
-    Wrapper class for mappers that handles dependency detection and
+    Wrapper for mappers that handles dependency detection and
     provides a more convenient interface.
     """
 
@@ -186,7 +186,7 @@ def map_collection(
     collection: ComputedCollection, mapper, *args, **kwargs
 ) -> ComputedCollection:
     """
-    Map a collection using a mapper wrapper.
+    Map a collection.
 
     Args:
         collection: The collection to map
@@ -213,8 +213,8 @@ def map_collection(
 
     # Use the classic map method with the correct mapper class and function
     return collection.map(
-        mapper_class,  # Pass the class, not the instance
-        mapper_wrapper.mapper_func,  # Pass the original function
+        mapper_class,
+        mapper_wrapper.mapper_func,
         *args,
         **kwargs,
     )

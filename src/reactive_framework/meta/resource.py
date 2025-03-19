@@ -64,7 +64,7 @@ def resource(name: Optional[str] = None, param_model: Optional[Type[BaseModel]] 
 
     Args:
         name: Optional name for the resource. If not provided, the function name will be used.
-        param_model: Optional Pydantic model for resource parameters.
+        param_model: Optional Pydantic model for resource parameters. If not provided, the framework will attempt to generate one.
 
     Returns:
         A decorator function that creates a Resource instance.
