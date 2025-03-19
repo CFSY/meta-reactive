@@ -2,6 +2,14 @@ import asyncio
 from datetime import datetime
 from typing import Dict, List, Tuple
 
+from reactive.classic.mapper import (
+    OneToOneMapper,
+    ManyToOneMapper,
+)
+from reactive.classic.resource import Resource, ResourceParams
+from reactive.classic.service import Service
+from reactive.core.compute_graph import ComputedCollection
+
 from examples.temp_monitor.common import (
     SensorReading,
     evaluate_temperature_alert,
@@ -9,13 +17,6 @@ from examples.temp_monitor.common import (
     DEFAULT_LOCATIONS,
     run_temperature_simulation,
 )
-from src.reactive_framework.classic.mapper import (
-    OneToOneMapper,
-    ManyToOneMapper,
-)
-from src.reactive_framework.classic.resource import Resource, ResourceParams
-from src.reactive_framework.classic.service import Service
-from src.reactive_framework.core.compute_graph import ComputedCollection
 
 
 # Define mappers

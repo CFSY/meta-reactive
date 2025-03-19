@@ -2,20 +2,21 @@ import asyncio
 from datetime import datetime
 from typing import Dict, List, Tuple
 
+from reactive.core.compute_graph import ComputedCollection
+from reactive.meta import (
+    Service,
+    resource,
+    one_to_one,
+    many_to_one,
+    map_collection,
+)
+
 from examples.temp_monitor.common import (
     SensorReading,
     evaluate_temperature_alert,
     LocationInfo,
     DEFAULT_LOCATIONS,
     run_temperature_simulation,
-)
-from src.reactive_framework.core.compute_graph import ComputedCollection
-from src.reactive_framework.meta import (
-    Service,
-    resource,
-    one_to_one,
-    many_to_one,
-    map_collection,
 )
 
 

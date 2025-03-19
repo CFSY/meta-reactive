@@ -1,4 +1,4 @@
-from src.reactive_framework.meta.detector import FrameworkDetector
+from src.reactive.meta.detector import FrameworkDetector
 
 # Create a framework detector for the meta API
 detector = FrameworkDetector("reactive_meta")
