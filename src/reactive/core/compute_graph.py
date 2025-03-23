@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import threading
 from datetime import datetime
@@ -244,15 +245,17 @@ class ComputedCollection(Collection[K, V]):
         Creates a new computed collection by applying a mapper to this collection.
 
         Args:
-            mapper_class: The mapper class (not an instance) to use for the transformation
-            *args: Positional arguments to pass to the mapper constructor
-            **kwargs: Keyword arguments to pass to the mapper constructor
+            mapper_class: The mapper class (not an instance) to use for the transformation.
+            *args: Positional arguments to pass to the mapper constructor.
+            **kwargs: Keyword arguments to pass to the mapper constructor.
 
         Returns:
-            A new ComputedCollection containing the mapped data
+            A new ComputedCollection containing the mapped data.
         """
-        # Generate a name for the new collection
-        name = f"{self.name}_mapped_{id(mapper_class)}"
+        # Generate a unique name for the new collection based on the mapper class and its parameters.
+        mapper_identifier = f"{mapper_class.__name__}:{args}:{kwargs}"
+        hash_digest = hashlib.sha256(mapper_identifier.encode()).hexdigest()[:8]
+        name = f"{self.name}_mapped_{hash_digest}"
 
         # Create the new computed collection
         result = ComputedCollection[K2, V2](name, self._compute_graph)
@@ -272,9 +275,9 @@ class ComputedCollection(Collection[K, V]):
         # Instantiate the mapper with the provided arguments
         mapper = mapper_class(*args, **kwargs)
 
-        # Define the compute function
-        def compute_func() -> dict[K2, V2]:
-            new_data: dict[K2, V2] = {}
+        # Define the compute function for the mapped collection
+        def compute_func() -> Dict[K2, V2]:
+            new_data: Dict[K2, V2] = {}
             for key, value in self.iter_items():
                 for mapped_key, mapped_value in mapper.map_element(key, value):
                     new_data[mapped_key] = mapped_value
