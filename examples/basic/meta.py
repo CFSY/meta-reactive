@@ -29,7 +29,7 @@ def processor(multiplier: float):
 
 
 # Create a service
-service = Service("data_processor", port=8080)
+service = Service("data_processor", port=1234)
 
 # Create a collection for raw data
 raw_data = ComputedCollection("raw_data", service.compute_graph)

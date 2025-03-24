@@ -8,7 +8,7 @@ async def run_client():
     async with aiohttp.ClientSession() as session:
         # Create stream
         async with session.post(
-            "http://localhost:8080/v1/streams/processor", json={"multiplier": 3.0}
+            "http://localhost:1234/v1/streams/processor", json={"multiplier": 3.0}
         ) as response:
             stream_data = await response.json()
             stream_id = stream_data["instance_id"]
@@ -16,7 +16,7 @@ async def run_client():
 
         # Connect to stream
         async with session.get(
-            f"http://localhost:8080/v1/streams/{stream_id}",
+            f"http://localhost:1234/v1/streams/{stream_id}",
             headers={
                 "Accept": "text/event-stream",
                 "Cache-Control": "no-cache",
