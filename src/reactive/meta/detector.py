@@ -10,45 +10,61 @@ T = TypeVar("T", bound=Callable)
 
 class FrameworkDetector:
     """
-    This class provides utilities to mark functions and classes as framework components
-    and to detect the usage of framework components within code.
+    Provides utilities to mark functions/classes as framework components
+    and detect usage of these components within Python code.
+
+    Uses LibCST for static analysis to find references. Tracks components
+    using special attributes based on the framework_name.
     """
 
     def __init__(self, framework_name: str = "generic_framework"):
         """
-        Initialize the framework detector.
+        Initializes the framework detector.
 
         Args:
-            framework_name: Name of the framework, used in attribute names
+            framework_name: A valid Python identifier used to namespace
+                            internal attributes that mark components and store references.
+
+        Raises:
+            ValueError: If framework_name is not a valid Python identifier.
         """
+        if not framework_name.isidentifier():
+            raise ValueError("framework_name must be a valid Python identifier")
         self.framework_name = framework_name
         self.framework_attr = f"__{framework_name}_component__"
         self.framework_refs_attr = f"__{framework_name}_refs__"
 
-        # Create analyzer
         self._analyzer = CodeAnalyzer(self)
-
-        # Cache for analyzed functions to avoid recursive loops
-        self._analysis_cache = {}
+        # Cache analysis results to avoid re-computation and recursion loops
+        self._analysis_cache: Dict[int, Set[str]] = {}
 
     def get_function_decorator(self) -> Callable[[T], T]:
         """
-        Creates a decorator that both marks a function as a framework component
-        and detects framework component usage within the function.
+        Creates a decorator to mark a function as a framework component.
+
+        The decorator also analyzes the function's source code upon definition
+        to detect usage of other framework components and stores the results.
 
         Returns:
-            A decorator function
+            A decorator function.
         """
 
         def decorator(func: T) -> T:
+            if not callable(func):
+                raise TypeError(
+                    f"Decorator can only be applied to callable objects, got {type(func)}"
+                )
+
             @functools.wraps(func)
             def wrapper(*args, **kwargs):
                 return func(*args, **kwargs)
 
+            # Mark the wrapper as a component
             setattr(wrapper, self.framework_attr, "function")
-            setattr(
-                wrapper, self.framework_refs_attr, self.detect_framework_usage(func)
-            )
+
+            # Analyze the original function and store references on the wrapper
+            references = self.detect_framework_usage(func)
+            setattr(wrapper, self.framework_refs_attr, references)
 
             return wrapper
 
@@ -56,37 +72,40 @@ class FrameworkDetector:
 
     def get_metaclass(self) -> Type:
         """
-        Creates a metaclass that both marks classes as framework components
-        and detects framework component usage within the class and its methods.
+        Creates a metaclass to mark a class as a framework component.
+
+        The metaclass also analyzes the class's __init__ method and any
+        user-defined methods upon class creation to detect usage of other
+        framework components, storing the results on the class and methods.
 
         Returns:
-            A metaclass for framework components
+            A metaclass for framework components.
         """
-        # Create a reference to the detector that will be accessible in the metaclass
         detector_ref = self
 
         class ComponentMeta(type):
             def __new__(mcs, name: str, bases: tuple, attrs: dict) -> Type:
-                # First create the class
                 new_class = super().__new__(mcs, name, bases, attrs)
 
-                # Mark the class as a framework component
+                # Mark the class itself as a component
                 setattr(new_class, detector_ref.framework_attr, "class")
 
-                # Detect framework usage in the class constructor
+                # Analyze __init__ for framework references
                 init_refs = detector_ref.detect_framework_usage(new_class)
                 if init_refs:
-                    setattr(
-                        new_class,
-                        detector_ref.framework_refs_attr,
-                        init_refs,
-                    )
+                    setattr(new_class, detector_ref.framework_refs_attr, init_refs)
 
-                # Find and analyze each method of the class
+                # Analyze user-defined methods defined directly in this class
                 for attr_name, attr_value in attrs.items():
-                    if callable(attr_value) and not attr_name.startswith("__"):
+                    if inspect.isfunction(attr_value) and not attr_name.startswith(
+                        "__"
+                    ):
                         curr_method = getattr(new_class, attr_name)
+
+                        # Mark the method as a component
                         setattr(curr_method, detector_ref.framework_attr, "method")
+
+                        # Analyze the method for framework references
                         method_refs = detector_ref.detect_framework_usage(curr_method)
                         if method_refs:
                             setattr(
@@ -101,75 +120,85 @@ class FrameworkDetector:
 
     def is_framework_component(self, obj: Any) -> bool:
         """
-        Check if an object is a framework component.
+        Checks if an object has been marked as a framework component by this detector.
 
         Args:
-            obj: The object to check
+            obj: The object to check.
 
         Returns:
-            True if the object is a framework component
+            True if the object is marked as a component, False otherwise.
         """
         return hasattr(obj, self.framework_attr)
 
     def get_framework_references(self, obj: Any) -> Optional[Set[str]]:
         """
-        Get the framework references used by an object if available.
+        Retrieves the stored set of framework references for a component.
 
         Args:
-            obj: The object to check
+            obj: The framework component (function, class, or method) to check.
 
         Returns:
-            Set of references or None if not available
+            A set of strings representing the detected framework references,
+            or None if the object hasn't been analyzed or has no references stored.
         """
-        if hasattr(obj, self.framework_refs_attr):
-            return getattr(obj, self.framework_refs_attr)
-        return None
+        return getattr(obj, self.framework_refs_attr, None)
 
     def detect_framework_usage(self, obj: Union[Callable, Type]) -> Set[str]:
         """
-        Detect framework component usage in a function, class, or class method.
+        Analyzes an object (function, method, or class) to detect usage of framework components.
+
+        For classes, it specifically analyzes the `__init__` method.
+        Uses caching to avoid redundant analysis and prevent infinite recursion.
 
         Args:
-            obj: The object to analyze (function, class, or method)
+            obj: The object to analyze.
 
         Returns:
-            Set of framework component references found
+            A set of strings representing the detected framework references.
+            Returns an empty set if analysis fails or no references are found.
         """
-        # Use cached results if available
-        obj_id = id(obj)
-        if obj_id in self._analysis_cache:
-            return self._analysis_cache[obj_id]
+        try:
+            # Use the underlying function for methods to ensure consistent caching key
+            cache_key = id(obj.__func__) if inspect.ismethod(obj) else id(obj)
+        except AttributeError:
+            cache_key = id(obj)  # Fallback for other callables or classes
 
-        # Mark as being analyzed to prevent infinite recursion
-        self._analysis_cache[obj_id] = set()
+        if cache_key in self._analysis_cache:
+            return self._analysis_cache[cache_key]
 
-        if inspect.isfunction(obj) or inspect.ismethod(obj):
-            result = self._analyzer.analyze_function(obj)
-            self._analysis_cache[obj_id] = result
-            return result
-        elif inspect.isclass(obj):
-            class_refs = set()
+        # Placeholder to prevent recursion during analysis
+        self._analysis_cache[cache_key] = set()
 
-            # Analyze class initialization
-            init_refs = self._analyzer.analyze_class_init(obj)
-            class_refs.update(init_refs)
+        result: Set[str] = set()
+        try:
+            if inspect.isfunction(obj) or inspect.ismethod(obj):
+                result = self._analyzer.analyze_function(obj)
+            elif inspect.isclass(obj):
+                # For classes, analysis focuses on the __init__ method
+                result = self._analyzer.analyze_class_init(obj)
+            else:
+                result = set()  # Not a supported type for analysis
 
-            self._analysis_cache[obj_id] = class_refs
-            return class_refs
-        else:
-            self._analysis_cache[obj_id] = set()
-            return set()
+        except Exception:
+            # Analysis failed, return empty set. Consider logging the error.
+            result = set()
+        finally:
+            # Store the final result in the cache
+            self._analysis_cache[cache_key] = result
+
+        return result
 
 
 class CodeAnalyzer:
-    """Analyzes code for framework component usage."""
+    """Performs static code analysis using LibCST to find framework references."""
 
     def __init__(self, framework_detector: FrameworkDetector):
         """
-        Initialize the code analyzer.
+        Initializes the code analyzer.
 
         Args:
-            framework_detector: The framework detector to use
+            framework_detector: The FrameworkDetector instance used to identify
+                                known framework components.
         """
         self.detector = framework_detector
 
@@ -177,293 +206,310 @@ class CodeAnalyzer:
         self,
         source_code: str,
         global_ns: Dict[str, Any],
-        local_ns: Dict[str, Any] = None,
+        local_ns: Optional[Dict[str, Any]] = None,
     ) -> Set[str]:
         """
-        Analyze source code for framework component usage.
+        Analyzes a string containing Python source code for framework references.
 
         Args:
-            source_code: The source code to analyze
-            global_ns: Global namespace for resolving names
-            local_ns: Local namespace for resolving names
+            source_code: The Python code to analyze.
+            global_ns: The global namespace for resolving names found in the code.
+            local_ns: The local namespace (e.g., closure) for resolving names.
 
         Returns:
-            Set of framework component references found
+            A set of strings representing detected framework references.
         """
+        references: Set[str] = set()
         try:
-            module = cst.parse_module(source_code)
-            visitor = FrameworkReferenceCollector(self.detector, global_ns, local_ns)
+            # Dedent source code before parsing to handle decorated functions correctly
+            module = cst.parse_module(textwrap.dedent(source_code))
+            visitor = FrameworkReferenceCollector(
+                self.detector, global_ns, local_ns or {}
+            )
             module.visit(visitor)
-            return self._deduplicate_references(visitor.framework_references)
+            references = visitor.framework_references
         except Exception:
+            # Parsing or visiting failed. Consider logging the error.
             return set()
+        return references
 
     def analyze_function(self, func: Callable) -> Set[str]:
         """
-        Analyze a function for framework component usage.
+        Analyzes a function or method for framework component usage.
+
+        This includes analyzing the function's own source code and recursively
+        analyzing other functions called within it to find indirect references.
 
         Args:
-            func: The function to analyze
+            func: The function or method to analyze.
 
         Returns:
-            Set of framework component references found
+            A set of strings representing both direct and indirect framework references.
         """
+        all_references: Set[str] = set()
         try:
             source = inspect.getsource(func)
-            source = textwrap.dedent(source)
-            module_globals = inspect.getmodule(func).__dict__
-            func_globals = func.__globals__
+            dedented_source = textwrap.dedent(source)
 
-            # Create a combined global namespace
-            global_ns = {}
-            global_ns.update(module_globals)
-            global_ns.update(func_globals)
+            # Resolve namespaces needed for analysis
+            func_globals = getattr(func, "__globals__", {})
+            base_func = func.__func__ if inspect.ismethod(func) else func
+            module_globals = (
+                inspect.getmodule(base_func).__dict__
+                if inspect.getmodule(base_func)
+                else {}
+            )
+            global_ns = {
+                **module_globals,
+                **func_globals,
+            }  # Function's globals take precedence
+            closure_ns = getattr(func, "__closure__", None)
 
-            references = self.analyze_source(source, global_ns, func.__closure__ or {})
+            # 1. Analyze direct references in this function's source
+            direct_references = self.analyze_source(
+                dedented_source, global_ns, closure_ns or {}
+            )
+            all_references.update(direct_references)
 
-            # Also check for indirect references through function calls
-            module = cst.parse_module(source)
-            call_extractor = FunctionCallExtractor(global_ns, func.__closure__ or {})
+            # 2. Find calls to other functions/methods within this source
+            module = cst.parse_module(dedented_source)
+            call_extractor = FunctionCallExtractor(global_ns, closure_ns or {})
             module.visit(call_extractor)
 
-            # Check each called function for framework references
+            # 3. Recursively analyze called functions for their references
             for called_func in call_extractor.called_functions:
-                if (
-                    called_func is not func
-                ):  # Avoid recursion on self-referential functions
-                    # Get references from the called function
-                    called_refs = self.detector.get_framework_references(called_func)
+                # Avoid infinite recursion for self-calls
+                if called_func is func or (
+                    inspect.ismethod(func) and called_func is func.__func__
+                ):
+                    continue
 
-                    # If no cached references, try to analyze it
-                    if called_refs is None and callable(called_func):
-                        # Recursively analyze the called function
-                        called_refs = self.detector.detect_framework_usage(called_func)
+                try:
+                    # Use the main detector entry point for analysis, leveraging caching
+                    indirect_refs = self.detector.detect_framework_usage(called_func)
+                    if indirect_refs:
+                        all_references.update(indirect_refs)
+                except Exception:
+                    # Failed to analyze a called function, ignore and continue. Consider logging.
+                    continue
 
-                    # Add any found references
-                    if called_refs:
-                        references.update(called_refs)
-
-            return references
-        except Exception as e:
+        except (TypeError, OSError, IndentationError, Exception):
+            # Failed to get source or parse. Consider logging.
             return set()
+
+        # Remove potential duplicates (e.g., attribute access vs. method call)
+        return self._deduplicate_references(all_references)
 
     def analyze_class_init(self, cls: Type) -> Set[str]:
         """
-        Analyze a class's __init__ method for framework component usage.
+        Analyzes a class's __init__ method for framework component usage.
 
         Args:
-            cls: The class to analyze
+            cls: The class whose __init__ method should be analyzed.
 
         Returns:
-            Set of framework component references found
+            A set of framework component references found in __init__.
         """
         try:
-            if not hasattr(cls, "__init__") or cls.__init__ is object.__init__:
+            init_method = getattr(cls, "__init__", None)
+            # Ignore if no custom __init__ or if it's the basic object.__init__
+            if not init_method or init_method is object.__init__:
                 return set()
 
-            source = inspect.getsource(cls)
-            module = cst.parse_module(source)
-
-            # Extract the __init__ method
-            extractor = FunctionBodyExtractor("__init__")
-            module.visit(extractor)
-
-            if not extractor.found or not extractor.function_body:
-                return set()
-
-            # Create a module with just the __init__ body
-            init_module = cst.Module(body=extractor.function_body.body)
-
-            # Get the namespaces
-            module_globals = inspect.getmodule(cls).__dict__
-
-            # Analyze the init body
-            visitor = FrameworkReferenceCollector(self.detector, module_globals)
-            init_module.visit(visitor)
-
-            dedup_references = self._deduplicate_references(
-                visitor.framework_references
-            )
-
-            # Check for indirect function calls in __init__
-            call_extractor = FunctionCallExtractor(module_globals)
-            init_module.visit(call_extractor)
-
-            for called_func in call_extractor.called_functions:
-                # Get references from the called function
-                called_refs = self.detector.get_framework_references(called_func)
-
-                # If no cached references, try to analyze it
-                if called_refs is None and callable(called_func):
-                    called_refs = self.detector.detect_framework_usage(called_func)
-
-                # Add any found references
-                if called_refs:
-                    dedup_references.update(called_refs)
-
-            return dedup_references
+            # Analyze __init__ just like any other function/method
+            # This leverages the caching and recursive analysis in detect_framework_usage
+            return self.detector.detect_framework_usage(init_method)
 
         except Exception:
+            # Analysis failed. Consider logging.
             return set()
-
-    def analyze_class_method(self, cls: Type, method_name: str) -> Set[str]:
-        """
-        Analyze a specific class method for framework component usage.
-
-        Args:
-            cls: The class containing the method
-            method_name: The name of the method to analyze
-
-        Returns:
-            Set of framework component references found
-        """
-        if not hasattr(cls, method_name):
-            return set()
-
-        method_ref = getattr(cls, method_name)
-        if not callable(method_ref):
-            return set()
-
-        return self.analyze_function(method_ref)
 
     def _deduplicate_references(self, framework_refs: Set[str]) -> Set[str]:
         """
-        Remove duplicate references where an attribute is also detected as a method call.
+        Cleans up detected references.
+
+        Specifically, if both an attribute access (`obj.attr`) and a method call
+        on that attribute (`obj.attr()`) are detected, it prefers the method call
+        representation.
 
         Args:
-            framework_refs: Set of detected references
+            framework_refs: The raw set of detected reference strings.
 
         Returns:
-            Deduplicated set of references
+            A potentially smaller set with duplicates removed.
         """
         result = set()
-        method_calls = {r for r in framework_refs if r.endswith("()")}
+        method_calls = {ref for ref in framework_refs if ref.endswith("()")}
+        method_call_bases = {
+            ref[:-2] for ref in method_calls
+        }  # e.g., 'obj.method' from 'obj.method()'
 
-        for curr_ref in framework_refs:
-            # If this is a method call, always include it
-            if curr_ref.endswith("()"):
-                result.add(curr_ref)
-            else:
-                # For an attribute access, check if there's also a method call version
-                method_call_version = f"{curr_ref}()"
-                if method_call_version not in method_calls:
-                    result.add(curr_ref)
-
+        for ref in framework_refs:
+            if ref.endswith("()"):
+                # Always keep method calls
+                result.add(ref)
+            elif ref not in method_call_bases:
+                # Keep attribute access only if no corresponding method call was found
+                result.add(ref)
         return result
 
 
 class FrameworkReferenceCollector(cst.CSTVisitor):
-    """Visitor that collects references to framework components in code."""
+    """
+    LibCST Visitor that traverses code and collects references to known
+    framework components based on the provided detector and namespaces.
+    """
 
     def __init__(
         self,
         framework_detector: FrameworkDetector,
         global_namespace: Dict[str, Any],
-        local_namespace: Dict[str, Any] = None,
+        local_namespace: Dict[str, Any],
     ):
         super().__init__()
         self.detector = framework_detector
         self.framework_references: Set[str] = set()
-        self.global_namespace = global_namespace
-        self.local_namespace = local_namespace or {}
+        # Combine namespaces for resolution, local scope takes precedence
+        self.combined_namespace = {**global_namespace, **local_namespace}
 
     def _resolve_name(self, name: str) -> Optional[Any]:
-        """Try to resolve a name to its actual object."""
-        if name in self.local_namespace:
-            return self.local_namespace.get(name)
-        return self.global_namespace.get(name)
+        """Resolves a simple name using the combined local/global namespace."""
+        return self.combined_namespace.get(name)
+
+    def _get_full_attribute_path(self, node: cst.Attribute) -> Optional[str]:
+        """Helper to reconstruct dotted paths like 'a.b.c' from CST nodes."""
+        path_parts = []
+        current_node = node
+        while isinstance(current_node, cst.Attribute):
+            path_parts.append(current_node.attr.value)
+            current_node = current_node.value
+        if isinstance(current_node, cst.Name):
+            path_parts.append(current_node.value)
+            return ".".join(reversed(path_parts))
+        return None  # Path doesn't start with a simple name (e.g., call result)
 
     def visit_Call(self, node: cst.Call) -> None:
-        """Detect calls to framework functions or constructors."""
+        """Visits function/method calls."""
         if isinstance(node.func, cst.Name):
-            # Direct function call: framework_function()
+            # Direct call like framework_func() or FrameworkClass()
             func_name = node.func.value
-            func_obj = self._resolve_name(func_name)
-
-            if func_obj and self.detector.is_framework_component(func_obj):
+            resolved_obj = self._resolve_name(func_name)
+            if resolved_obj and self.detector.is_framework_component(resolved_obj):
                 self.framework_references.add(f"{func_name}()")
 
         elif isinstance(node.func, cst.Attribute):
-            # Method call: obj.method()
-            if isinstance(node.func.value, cst.Name):
-                obj_name = node.func.value.value
-                method_name = node.func.attr.value
-                obj = self._resolve_name(obj_name)
+            # Method call like obj.method() or Class.static_method()
+            base_node = node.func.value
+            method_name = node.func.attr.value
 
-                if obj and self.detector.is_framework_component(obj):
-                    self.framework_references.add(f"{obj_name}.{method_name}()")
-
-                # Check if it's a method on a framework class
-                try:
-                    method_ref = getattr(obj, method_name, None)
-                    if method_ref and self.detector.is_framework_component(method_ref):
-                        self.framework_references.add(f"{obj_name}.{method_name}()")
-                except (AttributeError, TypeError):
-                    pass
+            if isinstance(base_node, cst.Name):
+                obj_name = base_node.value
+                base_obj = self._resolve_name(obj_name)
+                if base_obj:
+                    try:
+                        target_attr = getattr(base_obj, method_name, None)
+                        # Record if the method itself is marked as a component
+                        if target_attr and self.detector.is_framework_component(
+                            target_attr
+                        ):
+                            self.framework_references.add(f"{obj_name}.{method_name}()")
+                        # Also record if the base object/class is marked (calling a regular method on a framework object)
+                        elif self.detector.is_framework_component(base_obj):
+                            self.framework_references.add(f"{obj_name}.{method_name}()")
+                    except Exception:
+                        pass  # Ignore getattr errors on unusual objects
 
     def visit_Attribute(self, node: cst.Attribute) -> None:
-        """Detect access to framework object attributes."""
-        if isinstance(node.value, cst.Name):
-            obj_name = node.value.value
-            attr_name = node.attr.value
-            obj = self._resolve_name(obj_name)
+        """Visits attribute accesses like obj.attr."""
+        # This might record attributes that are immediately called (e.g., `obj.method` part of `obj.method()`).
+        # The _deduplicate_references method handles preferring the call `()` form later.
+        base_node = node.value
+        attr_name = node.attr.value
 
-            if obj and self.detector.is_framework_component(obj):
-                self.framework_references.add(f"{obj_name}.{attr_name}")
+        if isinstance(base_node, cst.Name):
+            obj_name = base_node.value
+            base_obj = self._resolve_name(obj_name)
+            if base_obj:
+                try:
+                    target_attr = getattr(base_obj, attr_name, None)
+                    # Record if the attribute itself is marked (e.g., a nested component)
+                    if target_attr and self.detector.is_framework_component(
+                        target_attr
+                    ):
+                        self.framework_references.add(f"{obj_name}.{attr_name}")
+                    # Also record if accessing an attribute on a marked object/class
+                    elif self.detector.is_framework_component(base_obj):
+                        self.framework_references.add(f"{obj_name}.{attr_name}")
+                except Exception:
+                    pass  # Ignore getattr errors
 
 
+# Note: FunctionBodyExtractor is primarily used internally by analyze_class_init
+# but is kept separate for clarity. It's less likely needed by end-users.
 class FunctionBodyExtractor(cst.CSTVisitor):
-    """Visitor that extracts the body of a specific function."""
+    """LibCST Visitor that extracts the CST node for a specific function's body."""
 
-    def __init__(self, target_function: str):
+    def __init__(self, target_function_name: str):
         super().__init__()
-        self.target_function = target_function
-        self.function_body = None
+        self.target_function_name = target_function_name
+        self.function_body: Optional[cst.BaseSuite] = None
         self.found = False
 
-    def visit_FunctionDef(self, node: cst.FunctionDef) -> None:
-        if node.name.value == self.target_function:
+    def visit_FunctionDef(self, node: cst.FunctionDef) -> bool:
+        """Checks if the function definition matches the target name."""
+        if node.name.value == self.target_function_name:
             self.function_body = node.body
             self.found = True
+            return False  # Stop visiting deeper within this node or siblings
+        return True  # Continue searching other definitions
 
 
 class FunctionCallExtractor(cst.CSTVisitor):
-    """Visitor that extracts all function calls within code."""
+    """
+    LibCST Visitor that finds all functions/methods called within a scope
+    and attempts to resolve them to actual callable objects.
+    """
 
     def __init__(
-        self, global_namespace: Dict[str, Any], local_namespace: Dict[str, Any] = None
+        self,
+        global_namespace: Dict[str, Any],
+        local_namespace: Optional[Dict[str, Any]] = None,
     ):
         super().__init__()
-        self.global_namespace = global_namespace
-        self.local_namespace = local_namespace or {}
-        self.called_functions = set()
+        self.combined_namespace = {**global_namespace, **(local_namespace or {})}
+        # Stores the actual callable objects found
+        self.called_functions: Set[Callable] = set()
 
     def _resolve_name(self, name: str) -> Optional[Any]:
-        """Try to resolve a name to its actual object."""
-        if name in self.local_namespace:
-            return self.local_namespace.get(name)
-        return self.global_namespace.get(name)
+        """Resolves a simple name using the combined local/global namespace."""
+        return self.combined_namespace.get(name)
 
     def visit_Call(self, node: cst.Call) -> None:
-        """Extract called functions."""
+        """Visits call nodes and tries to resolve the called object."""
+        resolved_callable = None
         if isinstance(node.func, cst.Name):
-            # Direct function call: some_function()
+            # Direct call: some_function()
             func_name = node.func.value
-            func_obj = self._resolve_name(func_name)
-
-            if func_obj and callable(func_obj):
-                self.called_functions.add(func_obj)
+            resolved_callable = self._resolve_name(func_name)
 
         elif isinstance(node.func, cst.Attribute):
-            # Method call: obj.method()
-            if isinstance(node.func.value, cst.Name):
-                obj_name = node.func.value.value
-                method_name = node.func.attr.value
-                obj = self._resolve_name(obj_name)
+            # Method/attribute call: obj.method()
+            base_node = node.func.value
+            method_name = node.func.attr.value
+            if isinstance(base_node, cst.Name):
+                obj_name = base_node.value
+                base_obj = self._resolve_name(obj_name)
+                if base_obj:
+                    try:
+                        resolved_callable = getattr(base_obj, method_name, None)
+                    except Exception:
+                        resolved_callable = None
+            # Note: Does not currently resolve complex bases like `get_obj().method()`
 
-                try:
-                    method_obj = getattr(obj, method_name, None)
-                    if method_obj and callable(method_obj):
-                        self.called_functions.add(method_obj)
-                except (AttributeError, TypeError):
-                    pass
+        if callable(resolved_callable):
+            try:
+                # Add the resolved callable object to the set
+                self.called_functions.add(resolved_callable)
+            except TypeError:
+                # Ignore unhashable callables if they occur
+                pass
